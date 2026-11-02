@@ -1,0 +1,7 @@
+{
+  "name": "SmartRegister",
+  "description": "DynamicDNA GPS-based enterprise attendance management system for workplace learners with geofence verification and administrative compliance audit.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
