@@ -365,19 +365,31 @@ export function deriveAttendanceState(
   if (!todayRecord || !todayRecord.clockInTime) {
     return 'NOT_CLOCKED_IN';
   }
-  if (todayRecord.clockOutTime) {
-    return 'COMPLETED';
-  }
+
   const clockOutEval = isClockOutAllowed(activeDate);
+
+  // Authoritative Rule:
+  // Before 15:15 SAST, daily attendance must remain in progress (CLOCK_OUT_PENDING).
+  // A clock-out cannot be completed or sealed before 15:15 SAST.
   if (!clockOutEval.allowed) {
     return 'CLOCK_OUT_PENDING';
   }
+
+  // At or after 15:15 SAST:
+  // If properly clocked out and persisted, status is COMPLETED.
+  if (todayRecord.clockOutTime && todayRecord.isSealed !== false) {
+    return 'COMPLETED';
+  }
+
+  // At or after 15:15 SAST and not yet clocked out:
+  // Shift clearance reached; clock-out is unlocked and available.
   return 'CLOCKED_IN';
 }
 
 /**
  * Generates Daily Access ID
  * Example format: SR-20261103-W9Q4A
+ * Deterministic for (date, learnerId) to ensure token consistency.
  */
 export function generateDailyAccessId(date: Date = new Date(), seed: string = ''): string {
   const { year, month, day } = getSASTComponents(date);
@@ -388,10 +400,25 @@ export function generateDailyAccessId(date: Date = new Date(), seed: string = ''
 
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let randPart = '';
-  // Combine random chars
-  for (let i = 0; i < 5; i++) {
-    const idx = Math.floor(Math.random() * chars.length);
-    randPart += chars[idx];
+
+  if (seed) {
+    // Generate deterministic 5-character token from seed + date
+    const composite = `${seed.trim().toLowerCase()}_${dateSegment}`;
+    let hash = 0;
+    for (let i = 0; i < composite.length; i++) {
+      hash = (hash << 5) - hash + composite.charCodeAt(i);
+      hash |= 0;
+    }
+    let h = Math.abs(hash);
+    for (let i = 0; i < 5; i++) {
+      randPart += chars[(h + i * 7) % chars.length];
+      h = Math.floor(h / 3) + (i + 1) * 13;
+    }
+  } else {
+    for (let i = 0; i < 5; i++) {
+      const idx = Math.floor(Math.random() * chars.length);
+      randPart += chars[idx];
+    }
   }
 
   return `SR-${dateSegment}-${randPart}`;

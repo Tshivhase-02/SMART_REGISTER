@@ -297,7 +297,9 @@ export const INITIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [
     status: 'Present',
     dayType: 'office',
     accessId: 'SR-20261103-W9Q4A',
-    notes: 'GPS Verified at DynamicDNA',
+    isSealed: false,
+    attendanceState: 'CLOCK_OUT_PENDING',
+    notes: 'GPS Verified at DynamicDNA (Distance: 32m)',
   },
   {
     id: 'rec_07',

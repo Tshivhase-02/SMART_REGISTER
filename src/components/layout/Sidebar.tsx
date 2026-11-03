@@ -82,37 +82,24 @@ export const Sidebar: React.FC = () => {
         </div>
 
         {isLearner && (
-          <>
-            <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-[#E5E7EB]">
-              <span>Attendance:</span>
-              <span
-                className={`font-semibold ${
-                  hasClockedOutToday
-                    ? 'text-emerald-700 font-bold'
-                    : hasClockedInToday
-                    ? 'text-blue-700'
-                    : 'text-amber-700'
-                }`}
-              >
-                {hasClockedOutToday
-                  ? 'Completed'
+          <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-[#E5E7EB]">
+            <span>Attendance:</span>
+            <span
+              className={`font-semibold ${
+                hasClockedOutToday
+                  ? 'text-emerald-700 font-bold'
                   : hasClockedInToday
-                  ? `${todayRecord?.status}`
-                  : 'Not Clocked In'}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 font-mono">
-              <span>Access ID:</span>
-              <span
-                className={`font-semibold truncate max-w-[100px] ${
-                  isDailyAccessVerified ? 'text-slate-800' : 'text-rose-700'
-                }`}
-              >
-                {isDailyAccessVerified ? dailyAccessId || 'Pending' : 'Denied'}
-              </span>
-            </div>
-          </>
+                  ? 'text-blue-700'
+                  : 'text-amber-700'
+              }`}
+            >
+              {hasClockedOutToday
+                ? 'Completed'
+                : hasClockedInToday
+                ? `${todayRecord?.status}`
+                : 'Not Clocked In'}
+            </span>
+          </div>
         )}
 
         {isAdmin && (
@@ -237,7 +224,7 @@ export const Sidebar: React.FC = () => {
               >
                 <span className="flex items-center gap-2.5">
                   <CheckSquare className="w-4 h-4 text-[#2F3E96]" />
-                  <span>Attendance</span>
+                  <span>Attendance Reports</span>
                 </span>
               </button>
 
@@ -294,27 +281,29 @@ export const Sidebar: React.FC = () => {
           </div>
         )}
 
-        {/* System Architecture Specifications (Accessible for reviewer verification) */}
-        <div className="pt-2 border-t border-[#E5E7EB]">
-          <button
-            onClick={() => setActiveScreen('specs_documentation')}
-            className={navItemClass('specs_documentation')}
-          >
-            <span className="flex items-center gap-2.5">
-              <Layers className="w-4 h-4 text-[#2F3E96]" />
-              <span>Full Specifications</span>
-            </span>
-            <span className="text-[9px] bg-amber-100 text-[#2F3E96] border border-[#F4B52C]/40 px-1.5 py-0.2 rounded font-bold">
-              20 Specs
-            </span>
-          </button>
-        </div>
+        {/* System Architecture Specifications (Admin Only) */}
+        {isAdmin && (
+          <div className="pt-2 border-t border-[#E5E7EB]">
+            <button
+              onClick={() => setActiveScreen('specs_documentation')}
+              className={navItemClass('specs_documentation')}
+            >
+              <span className="flex items-center gap-2.5">
+                <Layers className="w-4 h-4 text-[#2F3E96]" />
+                <span>Full Specifications</span>
+              </span>
+              <span className="text-[9px] bg-amber-100 text-[#2F3E96] border border-[#F4B52C]/40 px-1.5 py-0.2 rounded font-bold">
+                20 Specs
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Sign Out Action */}
         <div className="pt-2 border-t border-[#E5E7EB]">
           <button
             onClick={() => logout()}
-            className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-md transition-colors text-left text-rose-700 hover:bg-rose-50"
+            className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-md transition-colors text-left text-rose-700 hover:bg-rose-50 cursor-pointer"
             title="Sign out and return to Login & Registration portal"
           >
             <span className="flex items-center gap-2.5">
@@ -334,8 +323,6 @@ export const Sidebar: React.FC = () => {
         </div>
         <p className="leading-tight text-slate-500">
           DVT Learnership Programme
-          <br />
-          Radius: 100 Metres
         </p>
       </div>
     </aside>

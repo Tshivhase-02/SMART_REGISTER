@@ -297,7 +297,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [simulatedTime]);
 
   const activeTime = simulatedTime || currentTime;
-  const todayDateString = activeTime.toISOString().split('T')[0];
+  const sastComponents = getSASTComponents(activeTime);
+  const todayDateString = sastComponents.dateString;
+  const sastTimeString = sastComponents.timeString;
 
   // Geofence calculation against current workplace configuration
   const geofenceResult = useMemo(() => {
@@ -387,12 +389,21 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    // Verified: return or generate Daily Access ID
+    // Priority 1: If an attendance record already exists for this learner today, its accessId is authoritative
+    const existingLedgerRecord = attendanceRecords.find(
+      (rec) => rec.learnerId === currentUser.id && rec.date === todayDateString
+    );
+    if (existingLedgerRecord?.accessId) {
+      return { dailyAccessId: existingLedgerRecord.accessId, isDailyAccessVerified: true, accessDeniedMessage: null };
+    }
+
+    // Priority 2: Return session-cached access ID if present
     const existing = issuedAccessIds[key];
     if (existing) {
       return { dailyAccessId: existing, isDailyAccessVerified: true, accessDeniedMessage: null };
     }
 
+    // Priority 3: Generate deterministic Daily Access Token for (activeTime, currentUser.id)
     const newId = generateDailyAccessId(activeTime, currentUser.id);
     return { dailyAccessId: newId, isDailyAccessVerified: true, accessDeniedMessage: null };
   }, [
@@ -404,6 +415,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     systemControls,
     issuedAccessIds,
     activeTime,
+    attendanceRecords,
   ]);
 
   // Sync issued access ID to map if newly generated
@@ -416,18 +428,59 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [currentUser, dailyAccessId, todayDateString, issuedAccessIds]);
 
-  // Today's record for active learner
-  const todayRecord = currentUser
+  // Raw today's record for active learner
+  const rawTodayRecord = currentUser
     ? attendanceRecords.find(
         (rec) => rec.learnerId === currentUser.id && rec.date === todayDateString
       ) || null
     : null;
 
-  const hasClockedInToday = todayRecord !== null && Boolean(todayRecord.clockInTime);
-  const hasClockedOutToday = todayRecord !== null && Boolean(todayRecord.clockOutTime);
+  // Authoritative Server-Side Time Evaluation for Clock-Out Clearance (15:15 SAST)
+  const clockOutCheck = isClockOutAllowed(activeTime);
+  const isClockOutAllowedNow = clockOutCheck.allowed;
 
-  // Role switching
+  // Sanitized todayRecord:
+  // Before 15:15 SAST, Clock-Out CANNOT be completed or sealed.
+  // The application must never report a successful clock-out (e.g. at 15:40) when authoritative time is before 15:15.
+  const todayRecord: AttendanceRecord | null = useMemo(() => {
+    if (!rawTodayRecord) return null;
+
+    if (!isClockOutAllowedNow && rawTodayRecord.clockOutTime) {
+      // Authoritative business rule: daily attendance must remain IN PROGRESS before 15:15 SAST
+      return {
+        ...rawTodayRecord,
+        clockOutTime: undefined,
+        clockOutTimestamp: undefined,
+        clockOutDistance: undefined,
+        isSealed: false,
+        attendanceState: 'CLOCK_OUT_PENDING',
+      };
+    }
+
+    const state = deriveAttendanceState(rawTodayRecord, activeTime);
+    return {
+      ...rawTodayRecord,
+      attendanceState: state,
+    };
+  }, [rawTodayRecord, isClockOutAllowedNow, activeTime]);
+
+  // Derived logical attendance states:
+  // NOT_CLOCKED_IN | CLOCKED_IN | CLOCK_OUT_PENDING | COMPLETED
+  const attendanceState: TerminalAttendanceState = useMemo(() => {
+    return deriveAttendanceState(todayRecord, activeTime);
+  }, [todayRecord, activeTime]);
+
+  const hasClockedInToday = todayRecord !== null && Boolean(todayRecord.clockInTime);
+  const hasClockedOutToday =
+    todayRecord !== null && Boolean(todayRecord.clockOutTime) && isClockOutAllowedNow;
+
+  // Role switching (Protected: Admin or unauthenticated only)
   const switchUserRole = (role: 'learner' | 'admin') => {
+    // Learners cannot switch to admin or trigger persona change
+    if (currentUser && currentUser.role === 'learner') {
+      console.warn('Unauthorized role switch attempt blocked for learner.');
+      return;
+    }
     if (role === 'learner') {
       const learner = users.find((u) => u.role === 'learner') || users[0];
       setCurrentUser(learner);
@@ -441,12 +494,11 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Screen routing with role guard
   const setActiveScreen = (screen: ScreenId) => {
-    // If learner tries to access admin screen, block and route to learner_dashboard
-    if (currentUser?.role === 'learner' && screen.startsWith('admin_')) {
+    // If learner tries to access admin screen or specs documentation, block and keep on learner_dashboard
+    if (currentUser?.role === 'learner' && (screen.startsWith('admin_') || screen === 'specs_documentation')) {
       setActiveScreenState('learner_dashboard');
       return;
     }
-    // If admin tries to access learner screen, allow or route to admin_dashboard
     setActiveScreenState(screen);
   };
 
@@ -843,8 +895,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return res.status === 'success';
   };
 
-  // Workplace Configuration Operations (Admin)
+  // Workplace Configuration Operations (Admin Only)
   const updateWorkplaceConfig = (updates: Partial<WorkplaceOffice>, reason?: string) => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: Workplace configuration can only be modified by an administrator.');
+      return;
+    }
     setWorkplaceConfig((prev) => {
       const nextConfig: WorkplaceOffice = {
         ...prev,
@@ -942,6 +998,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const resetWorkplaceConfig = () => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: Workplace configuration can only be reset by an administrator.');
+      return;
+    }
     setWorkplaceConfig(DEFAULT_WORKPLACE_OFFICE);
     try {
       localStorage.setItem('smartregister_workplace_config', JSON.stringify(DEFAULT_WORKPLACE_OFFICE));
@@ -1158,25 +1218,45 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Schedule Management actions
+  // Schedule Management actions (Admin Only)
   const updateWeeklySchedule = (newSchedule: WeeklyScheduleConfig) => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: Schedule management requires administrative privileges.');
+      return;
+    }
     setWeeklySchedule(newSchedule);
   };
 
   const setScheduleOverride = (dateStr: string, dayType: DayScheduleType) => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: Schedule overrides require administrative privileges.');
+      return;
+    }
     setScheduleOverrides((prev) => ({ ...prev, [dateStr]: dayType }));
   };
 
   const resetSchedule = () => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: Schedule reset requires administrative privileges.');
+      return;
+    }
     setWeeklySchedule(DEFAULT_WEEKLY_SCHEDULE);
     setScheduleOverrides({});
   };
 
   const convertTodaySchedule = (type: DayScheduleType) => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: Schedule conversion requires administrative privileges.');
+      return;
+    }
     setScheduleOverrides((prev) => ({ ...prev, [todayDateString]: type }));
   };
 
   const updateSystemControls = (updater: Partial<SystemControlsConfig>) => {
+    if (currentUser?.role !== 'admin') {
+      console.warn('Unauthorized: System controls modification requires administrative privileges.');
+      return;
+    }
     setSystemControls((prev) => ({ ...prev, ...updater }));
   };
 
@@ -1238,6 +1318,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         convertTodaySchedule,
         attendanceRecords,
         todayRecord,
+        attendanceState,
+        sastTimeString,
         hasClockedInToday,
         hasClockedOutToday,
         clockIn,

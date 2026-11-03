@@ -138,6 +138,8 @@ export interface AttendanceRecord {
   verifiedDistanceMeters?: number;
   verificationStatus?: 'verified' | 'unverified' | 'wfh_exempt';
   accessId: string;
+  isSealed?: boolean;
+  attendanceState?: TerminalAttendanceState;
   notes?: string;
 }
 

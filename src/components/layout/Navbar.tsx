@@ -76,6 +76,7 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
   };
 
   const isLearner = currentUser?.role === 'learner';
+  const isAdmin = currentUser?.role === 'admin';
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
@@ -124,24 +125,6 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
             <span>Today: {todayScheduleType === 'office' ? 'Office' : 'Work From Home'}</span>
           </div>
 
-          {/* Daily Access ID indicator (For Learners) */}
-          {isLearner && (
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-medium rounded border ${
-                isDailyAccessVerified && dailyAccessId
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                  : 'bg-rose-50 border-rose-200 text-rose-800'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>
-                {isDailyAccessVerified && dailyAccessId
-                  ? dailyAccessId
-                  : 'Access Denied'}
-              </span>
-            </div>
-          )}
-
           {/* SAST Live Time */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded border bg-slate-50 border-slate-200 text-slate-700">
             <Clock className="w-3.5 h-3.5 text-slate-500" />
@@ -155,29 +138,33 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
             )}
           </div>
 
-          {/* Simulator Bar Toggle */}
-          <button
-            onClick={() => setIsTestControlsOpen(!isTestControlsOpen)}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
-            title="Adjust simulation tools: switch Office/WFH, shift time, or GPS radius"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-[#2F3E96]" />
-            <span>Test Tools</span>
-            <ChevronDown className="w-3 h-3 text-slate-400" />
-          </button>
+          {/* Simulator Bar Toggle (Admin Only) */}
+          {isAdmin && (
+            <button
+              onClick={() => setIsTestControlsOpen(!isTestControlsOpen)}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors"
+              title="Admin simulation tools"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#2F3E96]" />
+              <span>Test Tools</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+          )}
         </div>
 
         {/* Right: New Profile, Mobile View, Persona Switcher */}
         <div className="flex items-center gap-2">
-          {/* Create Learner Profile Button (Primary Button: Background #F4B52C, Text: White) */}
-          <button
-            onClick={onOpenCreateProfileModal}
-            className="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-[#F4B52C] hover:bg-[#E0A220] rounded transition-colors shadow-xs"
-            title="Create new learner profile"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>New Learner</span>
-          </button>
+          {/* Create Learner Profile Button (Admin Only) */}
+          {isAdmin && (
+            <button
+              onClick={onOpenCreateProfileModal}
+              className="hidden sm:flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-[#F4B52C] hover:bg-[#E0A220] rounded transition-colors shadow-xs"
+              title="Create new learner profile"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>New Learner</span>
+            </button>
+          )}
 
           {/* Mobile frame toggle */}
           <button
@@ -198,11 +185,11 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
             )}
           </button>
 
-          {/* User Profile & Role Switcher */}
+          {/* User Profile */}
           <div className="relative">
             <button
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-              className="flex items-center gap-2 pl-2 pr-2.5 py-1 text-xs font-medium rounded hover:bg-slate-100 border border-slate-200 transition-colors"
+              className="flex items-center gap-2 pl-2 pr-2.5 py-1 text-xs font-medium rounded hover:bg-slate-100 border border-slate-200 transition-colors cursor-pointer"
             >
               {currentUser?.avatarUrl ? (
                 <img
@@ -240,40 +227,42 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
                   </p>
                 </div>
 
-                {/* Role Switcher */}
-                <div className="px-3 py-2 border-b border-slate-100">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
-                    Switch Role Persona:
-                  </span>
-                  <div className="grid grid-cols-2 gap-1">
-                    <button
-                      onClick={() => {
-                        switchUserRole('learner');
-                        setIsProfileMenuOpen(false);
-                      }}
-                      className={`px-2 py-1 text-left rounded text-[11px] font-medium transition-colors ${
-                        currentUser?.role === 'learner'
-                          ? 'bg-[#2F3E96] text-white font-semibold'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      Zwavhudi (Learner)
-                    </button>
-                    <button
-                      onClick={() => {
-                        switchUserRole('admin');
-                        setIsProfileMenuOpen(false);
-                      }}
-                      className={`px-2 py-1 text-left rounded text-[11px] font-medium transition-colors ${
-                        currentUser?.role === 'admin'
-                          ? 'bg-[#2F3E96] text-white font-semibold'
-                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                      }`}
-                    >
-                      Thabo (Admin)
-                    </button>
+                {/* Role Switcher (Admin Only) */}
+                {isAdmin && (
+                  <div className="px-3 py-2 border-b border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block mb-1">
+                      Admin Test Persona Switch:
+                    </span>
+                    <div className="grid grid-cols-2 gap-1">
+                      <button
+                        onClick={() => {
+                          switchUserRole('learner');
+                          setIsProfileMenuOpen(false);
+                        }}
+                        className={`px-2 py-1 text-left rounded text-[11px] font-medium transition-colors ${
+                          currentUser?.role === 'learner'
+                            ? 'bg-[#2F3E96] text-white font-semibold'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        Learner View
+                      </button>
+                      <button
+                        onClick={() => {
+                          switchUserRole('admin');
+                          setIsProfileMenuOpen(false);
+                        }}
+                        className={`px-2 py-1 text-left rounded text-[11px] font-medium transition-colors ${
+                          currentUser?.role === 'admin'
+                            ? 'bg-[#2F3E96] text-white font-semibold'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        Admin View
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {isLearner && (
                   <>
@@ -282,7 +271,7 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
                         setActiveScreen('learner_directory');
                         setIsProfileMenuOpen(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
+                      className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer font-medium"
                     >
                       <Users className="w-3.5 h-3.5 text-[#2F3E96]" />
                       <span>Learner Directory</span>
@@ -292,7 +281,7 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
                         setActiveScreen('learner_profile');
                         setIsProfileMenuOpen(false);
                       }}
-                      className="w-full text-left px-3 py-1.5 text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer"
+                      className="w-full text-left px-3 py-2 text-slate-700 hover:bg-slate-100 flex items-center gap-2 cursor-pointer font-medium"
                     >
                       <User className="w-3.5 h-3.5 text-[#2F3E96]" />
                       <span>My Profile</span>
@@ -300,16 +289,18 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
                   </>
                 )}
 
-                <button
-                  onClick={() => {
-                    onOpenCreateProfileModal();
-                    setIsProfileMenuOpen(false);
-                  }}
-                  className="w-full text-left px-3 py-1.5 text-[#2F3E96] hover:bg-amber-50 flex items-center gap-2 font-medium"
-                >
-                  <UserPlus className="w-3.5 h-3.5 text-[#F4B52C]" />
-                  <span>Create New Learner Profile</span>
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      onOpenCreateProfileModal();
+                      setIsProfileMenuOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-[#2F3E96] hover:bg-amber-50 flex items-center gap-2 font-medium"
+                  >
+                    <UserPlus className="w-3.5 h-3.5 text-[#F4B52C]" />
+                    <span>Create New Learner Profile</span>
+                  </button>
+                )}
 
                 <div className="pt-1 mt-1 border-t border-slate-100">
                   <button
@@ -317,10 +308,10 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
                       logout();
                       setIsProfileMenuOpen(false);
                     }}
-                    className="w-full text-left px-3 py-1.5 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium"
+                    className="w-full text-left px-3 py-2 text-rose-600 hover:bg-rose-50 flex items-center gap-2 font-medium cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
-                    <span>Sign out</span>
+                    <span>Sign Out</span>
                   </button>
                 </div>
               </div>
@@ -329,8 +320,8 @@ export const Navbar: React.FC<{ onOpenCreateProfileModal: () => void }> = ({
         </div>
       </div>
 
-      {/* Simulator Tools Bar */}
-      {isTestControlsOpen && (
+      {/* Simulator Tools Bar (Admin Only) */}
+      {isAdmin && isTestControlsOpen && (
         <div className="bg-slate-900 text-white px-3 sm:px-6 py-2.5 text-xs border-t border-slate-700 shadow-inner">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Shift Time preset */}

@@ -321,36 +321,50 @@ export const attendanceVerificationService = {
       };
     }
 
-    if (existingRecord.clockOutTime) {
-      return {
-        success: false,
-        message: 'Clock-Out has already been registered for today. Attendance already finalized.',
-        errorCode: 'DUPLICATE_CLOCK_OUT',
-        serverTimestamp,
-      };
-    }
-
-    // Departure time check: 15:15 SAST
+    // 3. Departure time check: 15:15 SAST strictly enforced
     const clockOutEval = isClockOutAllowed(referenceDate);
     if (!clockOutEval.allowed) {
       return {
         success: false,
-        message: 'Clock-out is not available yet. You may clock out from 15:15.',
+        message: 'Clock-out is not permitted before 15:15 SAST. Daily attendance remains in progress.',
         errorCode: 'EARLY_CLOCK_OUT_NOT_PERMITTED',
         serverTimestamp,
       };
     }
 
-    const clockOutTimeString = sastOut.timeString;
-    let clockOutDistance: number | undefined;
+    // 4. Duplicate Clock-Out check
+    if (existingRecord.clockOutTime && existingRecord.isSealed) {
+      return {
+        success: false,
+        message: 'Clock-Out has already been registered for today. Daily attendance ledger is already sealed.',
+        errorCode: 'DUPLICATE_CLOCK_OUT',
+        serverTimestamp,
+      };
+    }
 
-    if (coordinates && typeof coordinates.latitude === 'number' && typeof coordinates.longitude === 'number') {
+    // 5. GPS verification for Office days
+    let clockOutDistance: number | undefined;
+    if (existingRecord.dayType === 'office') {
+      if (coordinates && typeof coordinates.latitude === 'number' && typeof coordinates.longitude === 'number') {
+        clockOutDistance = calculateDistanceMeters(coordinates, workplace.coordinates);
+        if (clockOutDistance > workplace.allowedRadiusMeters) {
+          return {
+            success: false,
+            message: `Clock-Out Denied. Today is an Office Day. You must be physically present at DynamicDNA (within ${workplace.allowedRadiusMeters}m). Current distance: ${clockOutDistance}m.`,
+            errorCode: 'OUTSIDE_WORKPLACE_RADIUS',
+            serverTimestamp,
+          };
+        }
+      }
+    } else if (coordinates && typeof coordinates.latitude === 'number' && typeof coordinates.longitude === 'number') {
       clockOutDistance = calculateDistanceMeters(coordinates, workplace.coordinates);
     }
 
+    const clockOutTimeString = sastOut.timeString;
+
     return {
       success: true,
-      message: `Clock-Out recorded successfully at ${clockOutTimeString} SAST. Shift completed.`,
+      message: `Clock-Out recorded successfully at ${clockOutTimeString} SAST. Shift completed and attendance ledger sealed.`,
       clockOutTime: clockOutTimeString,
       clockOutTimestamp: capturedTimestamp || serverTimestamp,
       clockOutDistance,

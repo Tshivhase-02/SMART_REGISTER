@@ -45,8 +45,8 @@ const MainLayout: React.FC = () => {
   }
 
   const renderActiveScreen = () => {
-    // Specs documentation accessible from either role
-    if (activeScreen === 'specs_documentation') {
+    // Specs documentation accessible from admin role only
+    if (activeScreen === 'specs_documentation' && currentUser?.role === 'admin') {
       return <SpecsDocumentationScreen />;
     }
 
@@ -157,11 +157,13 @@ const MainLayout: React.FC = () => {
         </div>
       )}
 
-      {/* Learner Self-Registration Modal */}
-      <CreateLearnerProfileModal
-        isOpen={isCreateProfileOpen}
-        onClose={() => setIsCreateProfileOpen(false)}
-      />
+      {/* Learner Registration Modal (Admin Only) */}
+      {currentUser?.role === 'admin' && (
+        <CreateLearnerProfileModal
+          isOpen={isCreateProfileOpen}
+          onClose={() => setIsCreateProfileOpen(false)}
+        />
+      )}
     </div>
   );
 };
