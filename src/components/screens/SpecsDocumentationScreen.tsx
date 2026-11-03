@@ -76,9 +76,9 @@ export const SpecsDocumentationScreen: React.FC = () => {
               <button
                 key={d.id}
                 onClick={() => setActiveTab(d.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded whitespace-nowrap font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded whitespace-nowrap font-medium transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-[#0F4C81] text-white font-semibold shadow-xs'
+                    ? 'bg-[#2F3E96] text-white font-semibold shadow-xs'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                 }`}
               >
@@ -351,42 +351,37 @@ Learner Clocks In via WFH Channel (07:15 - 09:00)`}</pre>
 
         {activeTab === 10 && (
           <div className="space-y-3">
-            <h3 className="text-sm font-bold text-slate-900 uppercase">10. Design System & Palette</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-7 gap-2 text-center">
-              <div className="p-2 border border-slate-200 rounded bg-white">
-                <div className="h-8 rounded bg-[#0F4C81] mb-1" />
-                <span className="font-bold block text-[11px]">Primary</span>
-                <span className="font-mono text-[9px] text-slate-500">#0F4C81</span>
+            <h3 className="text-sm font-bold text-slate-900 uppercase">10. DynamicDNA Official Design System & Palette</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
+              <div className="p-2 border border-[#E5E7EB] rounded bg-white">
+                <div className="h-8 rounded bg-[#F4B52C] mb-1" />
+                <span className="font-bold block text-[11px]">Brand Gold</span>
+                <span className="font-mono text-[9px] text-slate-500">#F4B52C</span>
               </div>
-              <div className="p-2 border border-slate-200 rounded bg-white">
-                <div className="h-8 rounded bg-[#1F2937] mb-1" />
-                <span className="font-bold block text-[11px]">Navy</span>
-                <span className="font-mono text-[9px] text-slate-500">#1F2937</span>
+              <div className="p-2 border border-[#E5E7EB] rounded bg-white">
+                <div className="h-8 rounded bg-[#2F3E96] mb-1" />
+                <span className="font-bold block text-[11px]">Brand Blue</span>
+                <span className="font-mono text-[9px] text-slate-500">#2F3E96</span>
               </div>
-              <div className="p-2 border border-slate-200 rounded bg-white">
-                <div className="h-8 rounded bg-[#16A34A] mb-1" />
-                <span className="font-bold block text-[11px]">Success</span>
-                <span className="font-mono text-[9px] text-slate-500">#16A34A</span>
+              <div className="p-2 border border-[#E5E7EB] rounded bg-white">
+                <div className="h-8 rounded bg-[#F5F5F5] border border-slate-300 mb-1" />
+                <span className="font-bold block text-[11px]">Page Background</span>
+                <span className="font-mono text-[9px] text-slate-500">#F5F5F5</span>
               </div>
-              <div className="p-2 border border-slate-200 rounded bg-white">
-                <div className="h-8 rounded bg-[#F59E0B] mb-1" />
-                <span className="font-bold block text-[11px]">Warning</span>
-                <span className="font-mono text-[9px] text-slate-500">#F59E0B</span>
-              </div>
-              <div className="p-2 border border-slate-200 rounded bg-white">
-                <div className="h-8 rounded bg-[#DC2626] mb-1" />
-                <span className="font-bold block text-[11px]">Danger</span>
-                <span className="font-mono text-[9px] text-slate-500">#DC2626</span>
-              </div>
-              <div className="p-2 border border-slate-200 rounded bg-white">
-                <div className="h-8 rounded bg-[#F5F7FA] border border-slate-300 mb-1" />
-                <span className="font-bold block text-[11px]">Background</span>
-                <span className="font-mono text-[9px] text-slate-500">#F5F7FA</span>
-              </div>
-              <div className="p-2 border border-slate-200 rounded bg-white">
+              <div className="p-2 border border-[#E5E7EB] rounded bg-white">
                 <div className="h-8 rounded bg-[#FFFFFF] border border-slate-300 mb-1" />
-                <span className="font-bold block text-[11px]">Cards</span>
+                <span className="font-bold block text-[11px]">Card Background</span>
                 <span className="font-mono text-[9px] text-slate-500">#FFFFFF</span>
+              </div>
+              <div className="p-2 border border-[#E5E7EB] rounded bg-white">
+                <div className="h-8 rounded bg-[#333333] mb-1" />
+                <span className="font-bold block text-[11px]">Primary Text</span>
+                <span className="font-mono text-[9px] text-slate-500">#333333</span>
+              </div>
+              <div className="p-2 border border-[#E5E7EB] rounded bg-white">
+                <div className="h-8 rounded bg-[#E5E7EB] border border-slate-300 mb-1" />
+                <span className="font-bold block text-[11px]">Border Color</span>
+                <span className="font-mono text-[9px] text-slate-500">#E5E7EB</span>
               </div>
             </div>
           </div>

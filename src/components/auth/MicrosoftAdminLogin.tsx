@@ -33,38 +33,38 @@ export const MicrosoftAdminLogin: React.FC<Props> = ({ onGoToLearnerLogin }) => 
   };
 
   return (
-    <div className="w-full max-w-[440px] bg-white border border-slate-200/90 rounded-md shadow-[0_2px_12px_rgba(0,0,0,0.08)] p-8 sm:p-10 text-slate-800">
-      {/* 1. Header with Branding */}
+    <div className="w-full max-w-[440px] bg-[#FFFFFF] border border-[#E5E7EB] rounded-lg shadow-[0_2px_12px_rgba(0,0,0,0.06)] p-8 sm:p-10 text-[#333333]">
+      {/* 1. Official DynamicDNA Header & Branding */}
       <div className="mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2.5">
-            <div className="grid grid-cols-2 gap-0.5 w-6 h-6 shrink-0">
-              <div className="bg-[#0F4C81] rounded-[1px]" />
-              <div className="bg-[#1F2937] rounded-[1px]" />
-              <div className="bg-[#0284c7] rounded-[1px]" />
-              <div className="bg-[#10b981] rounded-[1px]" />
-            </div>
-            <span className="text-base font-bold text-slate-900 tracking-tight leading-none">
-              SmartRegister
-            </span>
-          </div>
+        <div className="flex items-center justify-between mb-3">
+          <img
+            src="/dynamicdna-logo.png"
+            alt="DynamicDNA"
+            className="h-14 w-auto object-contain"
+            referrerPolicy="no-referrer"
+          />
 
           <button
             type="button"
             onClick={onGoToLearnerLogin}
-            className="p-1 text-slate-400 hover:text-slate-700 transition-colors"
-            title="Back"
+            className="p-1 text-slate-400 hover:text-[#2F3E96] transition-colors"
+            title="Back to Learner Login"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
         </div>
 
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-          DynamicDNA | DVT Learnership Programme
-        </p>
+        <div className="flex flex-col">
+          <span className="text-xl font-bold text-[#333333] tracking-tight leading-tight">
+            SmartRegister
+          </span>
+          <span className="text-xs font-semibold text-[#2F3E96] tracking-wide mt-0.5">
+            DynamicDNA | DVT Learnership Programme
+          </span>
+        </div>
 
-        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight mt-4">
-          Admin Login
+        <h1 className="text-2xl font-semibold text-[#333333] tracking-tight mt-5">
+          Administrator Sign In
         </h1>
       </div>
 
@@ -77,7 +77,7 @@ export const MicrosoftAdminLogin: React.FC<Props> = ({ onGoToLearnerLogin }) => 
       {/* 2. Admin Login Form */}
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="adminAccessId" className="block text-xs font-medium text-slate-700 mb-1">
+          <label htmlFor="adminAccessId" className="block text-xs font-semibold text-[#333333] mb-1">
             Access ID
           </label>
           <input
@@ -85,22 +85,25 @@ export const MicrosoftAdminLogin: React.FC<Props> = ({ onGoToLearnerLogin }) => 
             type="text"
             required
             autoFocus
-            placeholder="Enter Administrator Access ID"
+            placeholder="dynamic1937"
             value={accessId}
             onChange={(e) => {
               setAccessId(e.target.value);
               if (errorMessage) setErrorMessage(null);
             }}
-            className="w-full px-3 py-2 text-sm border-b-2 border-slate-700 focus:border-[#0F4C81] focus:outline-none transition-colors rounded-none placeholder:text-slate-400 font-normal"
+            className="w-full px-3 py-2 text-sm border-b-2 border-slate-700 focus:border-[#2F3E96] focus:outline-none transition-colors rounded-none placeholder:text-slate-400 font-mono font-medium"
           />
+          <p className="text-[11px] text-slate-500 mt-1.5">
+            Temporary Admin Access ID: <code className="bg-slate-100 text-[#2F3E96] font-bold px-1.5 py-0.5 rounded font-mono">dynamic1937</code>
+          </p>
         </div>
 
-        {/* Sign In Button */}
-        <div className="pt-3">
+        {/* Sign In Button (Primary Button: Background #F4B52C, Text: White) */}
+        <div className="pt-2">
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2.5 bg-[#0F4C81] hover:bg-[#0A355C] text-white font-semibold text-sm rounded transition-colors shadow-xs"
+            className="w-full py-2.5 bg-[#F4B52C] hover:bg-[#E0A220] text-white font-semibold text-sm rounded transition-colors shadow-xs cursor-pointer"
           >
             {isSubmitting ? 'Verifying...' : 'Sign In'}
           </button>

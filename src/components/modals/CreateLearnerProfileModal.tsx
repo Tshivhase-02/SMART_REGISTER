@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAttendance } from '../../context/AttendanceContext';
-import { UserPlus, CheckCircle2, ShieldCheck, X } from 'lucide-react';
+import { UserPlus, CheckCircle2, ShieldCheck, X, Lock } from 'lucide-react';
+import { toProperCase, generateWorkEmail } from '../../utils/nameUtils';
 
 export const CreateLearnerProfileModal: React.FC<{
   isOpen: boolean;
@@ -14,7 +15,17 @@ export const CreateLearnerProfileModal: React.FC<{
   const [createdProfile, setCreatedProfile] = useState<{
     learnerNumber: string;
     fullName: string;
+    workEmail: string;
   } | null>(null);
+
+  // Live auto-generated read-only preview of work email
+  const previewEmail = useMemo(() => {
+    if (!firstName.trim() && !lastName.trim()) {
+      return 'FirstName.LastName@dynamicdna.co.za';
+    }
+    const existingEmails = users.map((u) => u.workEmail);
+    return generateWorkEmail(firstName, lastName, existingEmails);
+  }, [firstName, lastName, users]);
 
   if (!isOpen) return null;
 
@@ -25,10 +36,17 @@ export const CreateLearnerProfileModal: React.FC<{
     e.preventDefault();
     if (!firstName.trim() || !lastName.trim() || !phoneNumber.trim()) return;
 
-    const profile = registerLearnerProfile(firstName, lastName, phoneNumber);
+    // Automatically convert to Proper Case as per DynamicDNA standards
+    const properFirst = toProperCase(firstName);
+    const properLast = toProperCase(lastName);
+    setFirstName(properFirst);
+    setLastName(properLast);
+
+    const profile = registerLearnerProfile(properFirst, properLast, phoneNumber);
     setCreatedProfile({
       learnerNumber: profile.learnerNumber,
       fullName: profile.fullName,
+      workEmail: profile.workEmail,
     });
   };
 
@@ -44,14 +62,17 @@ export const CreateLearnerProfileModal: React.FC<{
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
       <div className="bg-white rounded-lg border border-slate-200 shadow-xl max-w-md w-full p-6 text-xs space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded bg-[#0F4C81] text-white flex items-center justify-center">
-              <UserPlus className="w-4 h-4" />
-            </div>
+        <div className="flex items-center justify-between pb-3 border-b border-[#E5E7EB]">
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/dynamicdna-logo.png"
+              alt="DynamicDNA"
+              className="h-8 w-auto object-contain"
+              referrerPolicy="no-referrer"
+            />
             <div>
-              <h3 className="font-bold text-slate-900 text-sm">Learner Profile Creation</h3>
-              <p className="text-[11px] text-slate-500">DynamicDNA · DVT Learnership Programme</p>
+              <h3 className="font-bold text-[#333333] text-sm">Learner Profile Creation</h3>
+              <p className="text-[11px] text-[#2F3E96] font-medium">DynamicDNA | DVT Learnership Programme</p>
             </div>
           </div>
           <button
@@ -71,39 +92,42 @@ export const CreateLearnerProfileModal: React.FC<{
                 <p className="text-xs mt-1">
                   Welcome, <strong>{createdProfile.fullName}</strong>. Your official system learner number has been generated.
                 </p>
-                <div className="mt-3 p-2.5 bg-white border border-emerald-300 rounded font-mono text-center">
+                <div className="mt-3 p-2.5 bg-white border border-emerald-300 rounded font-mono text-center space-y-1">
                   <span className="text-[10px] text-slate-500 block uppercase">
                     System Assigned Learner Number:
                   </span>
-                  <span className="text-lg font-bold text-[#0F4C81]">
+                  <span className="text-lg font-bold text-[#2F3E96] block">
                     {createdProfile.learnerNumber}
                   </span>
+                  <div className="pt-1 border-t border-slate-100 text-[11px] text-[#2F3E96] font-bold">
+                    {createdProfile.workEmail}
+                  </div>
                 </div>
               </div>
             </div>
 
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              No passwords or OTPs required. When you open SmartRegister on an Office day within 100m or on a WFH day, your unique Daily Access ID will be generated automatically.
+              Name formatted to Proper Case. Your read-only enterprise work email has been registered as <code>FirstName.LastName@dynamicdna.co.za</code>.
             </p>
 
             <button
               type="button"
               onClick={handleFinish}
-              className="w-full py-2 px-4 bg-[#0F4C81] text-white font-semibold rounded hover:bg-[#0A355C] transition-colors"
+              className="w-full py-2.5 px-4 bg-[#F4B52C] hover:bg-[#E0A220] text-white font-semibold rounded transition-colors shadow-xs cursor-pointer"
             >
               Enter SmartRegister Dashboard
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-3.5">
-            <div className="bg-blue-50 border border-blue-200 text-blue-900 p-3 rounded text-[11px]">
-              <div className="flex items-center gap-1.5 font-bold mb-0.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-[#0F4C81]" />
+            <div className="bg-blue-50 border border-[#2F3E96]/30 text-slate-800 p-3 rounded text-[11px]">
+              <div className="flex items-center gap-1.5 font-bold mb-0.5 text-[#2F3E96]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[#2F3E96]" />
                 <span>Next Available Learner Number:</span>
               </div>
-              <span className="font-mono font-bold text-sm text-[#0F4C81]">{nextNum}</span>
+              <span className="font-mono font-bold text-sm text-[#2F3E96]">{nextNum}</span>
               <p className="text-slate-600 mt-1">
-                Learner numbers are sequentially assigned by the system upon profile registration.
+                Learner numbers and work emails are sequentially generated by the system in Proper Case.
               </p>
             </div>
 
@@ -114,10 +138,10 @@ export const CreateLearnerProfileModal: React.FC<{
               <input
                 type="text"
                 required
-                placeholder="e.g., Zwavhudi"
+                placeholder="Zwavhudi"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none"
+                className="w-full px-3 py-2 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none"
               />
             </div>
 
@@ -128,11 +152,30 @@ export const CreateLearnerProfileModal: React.FC<{
               <input
                 type="text"
                 required
-                placeholder="e.g., Tshivhase"
+                placeholder="Tshivhase"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none"
+                className="w-full px-3 py-2 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none"
               />
+            </div>
+
+            {/* Read-Only Auto-Generated Work Email Preview */}
+            <div className="p-3 bg-slate-50 border border-[#E5E7EB] rounded space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase font-bold text-slate-500">
+                  Assigned Work Email (Read-Only)
+                </span>
+                <span className="text-[9px] font-bold uppercase text-[#2F3E96] bg-[#2F3E96]/10 px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>Read-Only</span>
+                </span>
+              </div>
+              <div className="font-mono text-xs font-bold text-[#2F3E96] break-all">
+                {previewEmail}
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Generated automatically as <code>FirstName.LastName@dynamicdna.co.za</code>
+              </p>
             </div>
 
             <div>
@@ -142,24 +185,24 @@ export const CreateLearnerProfileModal: React.FC<{
               <input
                 type="tel"
                 required
-                placeholder="e.g., +27 71 892 4410"
+                placeholder="+27 60 816 4224"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
-                className="w-full px-3 py-2 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none"
+                className="w-full px-3 py-2 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none"
               />
             </div>
 
-            <div className="pt-2 flex justify-end gap-2 border-t border-slate-100">
+            <div className="pt-2 flex justify-end gap-2 border-t border-[#E5E7EB]">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 text-slate-600 hover:text-slate-900 font-medium"
+                className="px-3 py-1.5 text-slate-600 hover:text-slate-900 font-medium cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-[#0F4C81] text-white font-semibold rounded hover:bg-[#0A355C] transition-colors"
+                className="px-4 py-2 bg-[#F4B52C] hover:bg-[#E0A220] text-white font-semibold rounded transition-colors shadow-xs cursor-pointer"
               >
                 Create Profile & Generate Number
               </button>

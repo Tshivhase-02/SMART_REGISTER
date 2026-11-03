@@ -9,7 +9,7 @@ export const MicrosoftAuthContainer: React.FC = () => {
   const [currentView, setCurrentView] = useState<AuthView>('login');
 
   return (
-    <div className="min-h-screen bg-[#F0F2F5] flex flex-col justify-between items-center p-4 selection:bg-[#0F4C81] selection:text-white">
+    <div className="min-h-screen bg-[#F5F5F5] flex flex-col justify-between items-center p-4 selection:bg-[#F4B52C] selection:text-[#2F3E96]">
       {/* Top spacing */}
       <div className="w-full h-8" />
 

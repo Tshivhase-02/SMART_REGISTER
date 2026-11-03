@@ -6,7 +6,7 @@ export const AdminSettingsScreen: React.FC = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* 1. Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
             <span>DVT Learnership Governance</span>
@@ -24,9 +24,9 @@ export const AdminSettingsScreen: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Office & Coordinates Card */}
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4">
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <Building2 className="w-4 h-4 text-[#0F4C81]" />
+            <Building2 className="w-4 h-4 text-[#2F3E96]" />
             <h3 className="text-xs font-bold text-slate-900 uppercase">
               Workplace Geofence Configuration
             </h3>
@@ -44,18 +44,18 @@ export const AdminSettingsScreen: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-2 font-mono">
-              <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+              <div className="bg-slate-50 p-2.5 rounded border border-[#E5E7EB]">
                 <span className="text-[10px] text-slate-500 block">Latitude:</span>
                 <span className="font-bold text-slate-900">{DYNAMIC_DNA_OFFICE.coordinates.latitude}</span>
               </div>
-              <div className="bg-slate-50 p-2.5 rounded border border-slate-200">
+              <div className="bg-slate-50 p-2.5 rounded border border-[#E5E7EB]">
                 <span className="text-[10px] text-slate-500 block">Longitude:</span>
                 <span className="font-bold text-slate-900">{DYNAMIC_DNA_OFFICE.coordinates.longitude}</span>
               </div>
             </div>
 
             <div className="p-3 bg-blue-50 border border-blue-200 rounded text-slate-800">
-              <span className="text-[10px] font-bold uppercase text-[#0F4C81] block">
+              <span className="text-[10px] font-bold uppercase text-[#2F3E96] block">
                 Geofence Radius Constraint:
               </span>
               <span className="text-base font-bold text-slate-900 font-mono">
@@ -69,16 +69,16 @@ export const AdminSettingsScreen: React.FC = () => {
         </div>
 
         {/* Shift Timings & Attendance Rules Card */}
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-4">
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-            <Clock className="w-4 h-4 text-[#0F4C81]" />
+            <Clock className="w-4 h-4 text-[#2F3E96]" />
             <h3 className="text-xs font-bold text-slate-900 uppercase">
               Shift Windows & Attendance Rules
             </h3>
           </div>
 
           <div className="space-y-3 text-xs">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded space-y-2">
+            <div className="p-3 bg-slate-50 border border-[#E5E7EB] rounded space-y-2">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-slate-700">Clock-In Window Opens:</span>
                 <span className="font-mono font-bold text-slate-900">07:15</span>
@@ -97,7 +97,7 @@ export const AdminSettingsScreen: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-2.5 bg-slate-50 border border-slate-200 rounded text-[11px] text-slate-600">
+            <div className="p-2.5 bg-slate-50 border border-[#E5E7EB] rounded text-[11px] text-slate-600">
               <strong>Attendance Statuses:</strong> Strictly recorded as <code>Present</code>, <code>Late</code>, or <code>Absent</code>.
             </div>
           </div>
@@ -105,9 +105,9 @@ export const AdminSettingsScreen: React.FC = () => {
       </div>
 
       {/* Statutory Public Holidays */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs space-y-3">
         <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-          <Calendar className="w-4 h-4 text-[#0F4C81]" />
+          <Calendar className="w-4 h-4 text-[#2F3E96]" />
           <h3 className="text-xs font-bold text-slate-900 uppercase">
             South Africa Statutory Public Holidays (Excluded From Registers)
           </h3>
@@ -115,7 +115,7 @@ export const AdminSettingsScreen: React.FC = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 text-xs">
           {Object.entries(SA_PUBLIC_HOLIDAYS_2026).map(([dateStr, name]) => (
-            <div key={dateStr} className="p-2.5 bg-slate-50 border border-slate-200 rounded">
+            <div key={dateStr} className="p-2.5 bg-slate-50 border border-[#E5E7EB] rounded">
               <span className="font-mono text-[11px] text-slate-500 block">{dateStr}</span>
               <span className="font-semibold text-slate-800">{name}</span>
             </div>

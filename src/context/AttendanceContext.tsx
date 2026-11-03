@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import {
   AbsenceReason,
   AbsenceRequest,
@@ -6,17 +6,26 @@ import {
   AttendanceStatus,
   Coordinates,
   DayScheduleType,
+  LocationVerificationResult,
   SystemControlsConfig,
+  TerminalAttendanceState,
   UserProfile,
   WeeklyScheduleConfig,
+  WorkplaceAuditLog,
+  WorkplaceOffice,
 } from '../types/attendance';
 import {
+  DEFAULT_WORKPLACE_OFFICE,
   DYNAMIC_DNA_OFFICE,
+  calculateDistanceMeters,
+  deriveAttendanceState,
   evaluateClockInStatus,
   evaluateWorkingDay,
   generateDailyAccessId,
+  getSASTComponents,
   isClockOutAllowed,
   isWithinGeofence,
+  verifyLocationAgainstWorkplace,
 } from '../utils/geoUtils';
 import {
   DEFAULT_SYSTEM_CONTROLS,
@@ -26,12 +35,15 @@ import {
   INITIAL_LEARNERS,
   TEST_LOCATION_PRESETS,
 } from '../data/mockData';
+import { toProperCase, generateWorkEmail } from '../utils/nameUtils';
+import { attendanceVerificationService } from '../services/attendanceVerificationService';
 
 export type LearnerScreenId =
   | 'learner_dashboard'
   | 'learner_attendance'
   | 'learner_history'
   | 'learner_report_absence'
+  | 'learner_directory'
   | 'learner_profile';
 
 export type AdminScreenId =
@@ -53,6 +65,7 @@ interface AttendanceContextType {
   users: UserProfile[];
   activeScreen: ScreenId;
   setActiveScreen: (screen: ScreenId) => void;
+  switchUserRole: (role: 'learner' | 'admin') => void;
   // Authentication & Registration Workflow
   loginLearner: (
     workEmail: string,
@@ -66,7 +79,7 @@ interface AttendanceContextType {
     password: string
   ) => { success: boolean; generatedWorkEmail: string };
   approveLearnerRegistration: (id: string) => { success: boolean; learnerNumber: string };
-  rejectLearnerRegistration: (id: string) => { success: boolean };
+  rejectLearnerRegistration: (id: string, reason?: string) => { success: boolean };
   pendingRegistrations: UserProfile[];
 
   // Legacy/Compatibility Auth
@@ -80,6 +93,10 @@ interface AttendanceContextType {
     workEmail?: string
   ) => UserProfile;
   updateProfileDetails: (phoneNumber: string, avatarUrl?: string) => void;
+  updateLearnerProfile: (
+    id: string,
+    updates: Partial<UserProfile>
+  ) => { success: boolean; error?: string };
   toggleLearnerStatus: (id: string) => void;
   editLearner: (updated: UserProfile) => void;
 
@@ -104,11 +121,21 @@ interface AttendanceContextType {
   getScheduleForDate: (date: Date) => DayScheduleType;
   todayScheduleType: DayScheduleType;
 
-  // GPS Telemetry
+  // Authorised Workplace Configuration & Audit
+  workplaceConfig: WorkplaceOffice;
+  workplaceAuditLogs: WorkplaceAuditLog[];
+  updateWorkplaceConfig: (updates: Partial<WorkplaceOffice>, reason?: string) => void;
+  resetWorkplaceConfig: () => void;
+
+  // GPS Telemetry & Verification
   currentCoordinates: Coordinates;
   selectedPresetId: string;
   setCoordinatesPreset: (presetId: string) => void;
   useBrowserGeolocation: () => Promise<boolean>;
+  captureAndVerifyLocation: () => Promise<LocationVerificationResult>;
+  locationVerificationResult: LocationVerificationResult | null;
+  isCapturingLocation: boolean;
+  lastLocationCapturedAt: string | null;
   distanceFromOffice: number;
   isLocationVerified: boolean;
   gpsAccuracyMeters: number;
@@ -127,6 +154,8 @@ interface AttendanceContextType {
   // Attendance Records & Actions
   attendanceRecords: AttendanceRecord[];
   todayRecord: AttendanceRecord | null;
+  attendanceState: TerminalAttendanceState;
+  sastTimeString: string;
   hasClockedInToday: boolean;
   hasClockedOutToday: boolean;
   clockIn: (notes?: string) => { success: boolean; message: string };
@@ -145,7 +174,35 @@ interface AttendanceContextType {
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [users, setUsers] = useState<UserProfile[]>(INITIAL_LEARNERS);
+  const [users, setUsers] = useState<UserProfile[]>(() => {
+    try {
+      const saved = localStorage.getItem('smartregister_learners_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const idMap = new Map<string, UserProfile>(parsed.map((p: UserProfile) => [p.id, p]));
+          const merged = INITIAL_LEARNERS.map((init) => {
+            const existing = idMap.get(init.id);
+            if (!existing) return init;
+            return {
+              ...init,
+              ...existing,
+              jobTitle: existing.jobTitle || init.jobTitle,
+              profilePictureUrl: existing.profilePictureUrl || init.profilePictureUrl,
+              linkedInUrl: existing.linkedInUrl !== undefined ? existing.linkedInUrl : init.linkedInUrl,
+              gitHubUrl: existing.gitHubUrl !== undefined ? existing.gitHubUrl : init.gitHubUrl,
+            };
+          });
+          const initIds = new Set(INITIAL_LEARNERS.map((i) => i.id));
+          const custom = parsed.filter((p: UserProfile) => !initIds.has(p.id));
+          return [...merged, ...custom];
+        }
+      }
+    } catch (e) {
+      console.warn('localStorage read error', e);
+    }
+    return INITIAL_LEARNERS;
+  });
   // Default unauthenticated so user starts on the Microsoft 365 style sign-in flow
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [activeScreen, setActiveScreenState] = useState<ScreenId>('learner_dashboard');
@@ -171,6 +228,55 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [selectedPresetId, setSelectedPresetId] = useState<string>(defaultPreset.id);
   const [currentCoordinates, setCurrentCoordinates] = useState<Coordinates>(defaultPreset.coordinates);
   const [gpsAccuracyMeters, setGpsAccuracyMeters] = useState<number>(defaultPreset.coordinates.accuracy || 4);
+  const [isCapturingLocation, setIsCapturingLocation] = useState<boolean>(false);
+  const [lastLocationCapturedAt, setLastLocationCapturedAt] = useState<string | null>(null);
+
+  // Authorised Workplace Configuration (Persisted)
+  const [workplaceConfig, setWorkplaceConfig] = useState<WorkplaceOffice>(() => {
+    try {
+      const saved = localStorage.getItem('smartregister_workplace_config');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Failed reading workplace config from localStorage', e);
+    }
+    return DEFAULT_WORKPLACE_OFFICE;
+  });
+
+  // Workplace Audit Logs
+  const [workplaceAuditLogs, setWorkplaceAuditLogs] = useState<WorkplaceAuditLog[]>(() => {
+    try {
+      const saved = localStorage.getItem('smartregister_workplace_audit_logs');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed reading workplace audit logs', e);
+    }
+    return [
+      {
+        id: 'log_init_01',
+        timestamp: '2026-11-01T08:00:00.000Z',
+        adminId: 'adm_001',
+        adminName: 'Thabo Mokoena (DVT Supervisor)',
+        action: 'FULL_CONFIG_UPDATE',
+        details: 'Initial configuration: DynamicDNA Campus coordinates set to (-26.097841, 27.998357) with 100m radius and 30m accuracy threshold.',
+        changes: [
+          { field: 'name', oldValue: 'Unassigned', newValue: 'DynamicDNA Campus' },
+          { field: 'allowedRadiusMeters', oldValue: 0, newValue: 100 },
+          { field: 'gpsAccuracyThresholdMeters', oldValue: 0, newValue: 30 },
+          { field: 'isActive', oldValue: false, newValue: true },
+        ],
+      },
+    ];
+  });
+
+  // Location Verification Result (Initialized for default coordinates)
+  const [locationVerificationResult, setLocationVerificationResult] = useState<LocationVerificationResult | null>(() => {
+    return verifyLocationAgainstWorkplace(defaultPreset.coordinates, DEFAULT_WORKPLACE_OFFICE);
+  });
 
   // Daily Access IDs store per user per date: { [userId_dateStr]: string }
   const [issuedAccessIds, setIssuedAccessIds] = useState<Record<string, string>>({
@@ -193,14 +299,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const activeTime = simulatedTime || currentTime;
   const todayDateString = activeTime.toISOString().split('T')[0];
 
-  // Geofence calculation
-  const geofenceResult = isWithinGeofence(
-    currentCoordinates,
-    DYNAMIC_DNA_OFFICE.coordinates,
-    DYNAMIC_DNA_OFFICE.allowedRadiusMeters
-  );
+  // Geofence calculation against current workplace configuration
+  const geofenceResult = useMemo(() => {
+    return isWithinGeofence(
+      currentCoordinates,
+      workplaceConfig.coordinates,
+      workplaceConfig.allowedRadiusMeters
+    );
+  }, [currentCoordinates, workplaceConfig]);
+
   const distanceFromOffice = geofenceResult.distance;
-  const isLocationVerified = geofenceResult.isWithin;
+  const isAccuracyAcceptable = gpsAccuracyMeters <= workplaceConfig.gpsAccuracyThresholdMeters;
+  const isLocationVerified = geofenceResult.isWithin && isAccuracyAcceptable && workplaceConfig.isActive;
 
   // Working day evaluation
   const workingDayStatus = evaluateWorkingDay(activeTime);
@@ -361,32 +471,51 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       };
     }
 
-    if (found.status === 'pending_approval') {
-      return {
-        success: false,
-        isPendingApproval: true,
-        error:
-          'Your registration request has not yet been approved. Please contact your administrator if approval takes longer than expected.',
-      };
-    }
+    const DEV_TEST_EMAIL = 'zwavhudi.tshivhase@dynamicdna.co.za';
+    const isDevTestAccount =
+      cleaned === DEV_TEST_EMAIL ||
+      cleaned === 'zwavhudi' ||
+      found.workEmail.toLowerCase() === DEV_TEST_EMAIL;
 
-    if (found.status === 'rejected') {
-      return {
-        success: false,
-        error:
-          'Your registration request was not approved by the administrator. Please contact DynamicDNA administration.',
-      };
-    }
+    // For development test account only:
+    // Disable validation for Registration Status & Approval Status to allow immediate login.
+    // (All attendance rules: GPS, Schedule, Office Day, Time rules remain 100% active).
+    if (!isDevTestAccount) {
+      if (found.status === 'pending_approval') {
+        return {
+          success: false,
+          isPendingApproval: true,
+          error:
+            'Your registration request has not yet been approved. Please contact your administrator if approval takes longer than expected.',
+        };
+      }
 
-    if (found.status === 'inactive') {
-      return {
-        success: false,
-        error: 'Your account is deactivated. Please contact your DVT Programme Administrator.',
-      };
+      if (found.status === 'rejected') {
+        return {
+          success: false,
+          error:
+            'Your registration request was not approved by the administrator. Please contact DynamicDNA administration.',
+        };
+      }
+
+      if (found.status === 'inactive') {
+        return {
+          success: false,
+          error: 'Your account is deactivated. Please contact your DVT Programme Administrator.',
+        };
+      }
     }
 
     // Check password if set on profile
-    if (password && found.password && found.password !== password) {
+    if (isDevTestAccount) {
+      // Dev test account password: dynamic1937 (also fallback to password123 or blank for convenience)
+      if (password && password !== 'dynamic1937' && password !== 'password123') {
+        return {
+          success: false,
+          error: 'The password entered is incorrect. Development test account password is dynamic1937.',
+        };
+      }
+    } else if (password && found.password && found.password !== password) {
       return {
         success: false,
         error: 'The password entered is incorrect. Please try again.',
@@ -401,6 +530,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const adminLoginWithAccessId = (accessId: string): { success: boolean; error?: string } => {
     const cleaned = accessId.trim().toLowerCase();
     const validKeys = [
+      'dynamic1937',
       'dvt-adm-001',
       'adm-2026-001',
       'admin',
@@ -423,26 +553,31 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     return {
       success: false,
-      error: 'Invalid Access ID. Please enter an authorized administrator Access ID.',
+      error: 'Invalid Access ID. Please enter an authorized administrator Access ID (e.g. dynamic1937).',
     };
   };
 
   const submitRegistration = (
-    firstName: string,
-    lastName: string,
+    rawFirstName: string,
+    rawLastName: string,
     contactNumber: string,
     password: string
   ): { success: boolean; generatedWorkEmail: string } => {
-    const cleanFirst = firstName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanLast = lastName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const generatedWorkEmail = `${cleanFirst}.${cleanLast}@learners.dynamicdna.co.za`;
+    // 1. Convert names to Proper Case as per DynamicDNA specifications
+    const firstName = toProperCase(rawFirstName);
+    const lastName = toProperCase(rawLastName);
+    const fullName = `${firstName} ${lastName}`;
+
+    // 2. Generate unique work email: FirstName.LastName@dynamicdna.co.za
+    const existingEmails = users.map((u) => u.workEmail);
+    const generatedWorkEmail = generateWorkEmail(firstName, lastName, existingEmails);
 
     const newProfile: UserProfile = {
       id: `lrn_${Date.now()}`,
       learnerNumber: 'PENDING',
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      fullName: `${firstName.trim()} ${lastName.trim()}`,
+      firstName,
+      lastName,
+      fullName,
       workEmail: generatedWorkEmail,
       phoneNumber: contactNumber.trim(),
       password,
@@ -482,7 +617,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return { success: true, learnerNumber };
   };
 
-  const rejectLearnerRegistration = (id: string): { success: boolean } => {
+  const rejectLearnerRegistration = (id: string, _reason?: string): { success: boolean } => {
     setUsers((prev) =>
       prev.map((u) => (u.id === id ? { ...u, status: 'rejected' } : u))
     );
@@ -499,8 +634,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Learner profile self-registration
   const registerLearnerProfile = (
-    firstName: string,
-    lastName: string,
+    rawFirstName: string,
+    rawLastName: string,
     phoneNumber: string,
     workEmail?: string
   ): UserProfile => {
@@ -508,17 +643,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const nextNumber = existingLearners.length + 1;
     const learnerNumber = `DVT-2026-${String(nextNumber).padStart(3, '0')}`;
 
-    const cleanFirst = firstName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-    const cleanLast = lastName.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+    const firstName = toProperCase(rawFirstName);
+    const lastName = toProperCase(rawLastName);
+    const fullName = `${firstName} ${lastName}`;
+    const existingEmails = users.map((u) => u.workEmail);
     const computedEmail =
-      workEmail?.trim() || `${cleanFirst}.${cleanLast}@learners.dynamicdna.co.za`;
+      workEmail?.trim() || generateWorkEmail(firstName, lastName, existingEmails);
 
     const newProfile: UserProfile = {
       id: `lrn_${Date.now()}`,
       learnerNumber,
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
-      fullName: `${firstName.trim()} ${lastName.trim()}`,
+      firstName,
+      lastName,
+      fullName,
       workEmail: computedEmail,
       phoneNumber: phoneNumber.trim(),
       programme: 'DVT Learnership Programme',
@@ -541,9 +678,68 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ...currentUser,
       phoneNumber: phoneNumber.trim(),
       avatarUrl: avatarUrl || currentUser.avatarUrl,
+      profilePictureUrl: avatarUrl || currentUser.profilePictureUrl || currentUser.avatarUrl,
     };
-    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    setUsers((prev) => {
+      const next = prev.map((u) => (u.id === currentUser.id ? updated : u));
+      try {
+        localStorage.setItem('smartregister_learners_v2', JSON.stringify(next));
+      } catch (e) {
+        console.warn('localStorage save failed', e);
+      }
+      return next;
+    });
     setCurrentUser(updated);
+  };
+
+  const updateLearnerProfile = (
+    id: string,
+    updates: Partial<UserProfile>
+  ): { success: boolean; error?: string } => {
+    if (!currentUser || currentUser.id !== id) {
+      return { success: false, error: 'Unauthorized: You are only permitted to update your own profile.' };
+    }
+
+    const existing = users.find((u) => u.id === id);
+    if (!existing) {
+      return { success: false, error: 'Learner record not found.' };
+    }
+
+    const firstName = updates.firstName !== undefined ? updates.firstName.trim() : existing.firstName;
+    const lastName = updates.lastName !== undefined ? updates.lastName.trim() : existing.lastName;
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    const updated: UserProfile = {
+      ...existing,
+      firstName,
+      lastName,
+      fullName,
+      phoneNumber: updates.phoneNumber !== undefined ? updates.phoneNumber.trim() : existing.phoneNumber,
+      jobTitle: updates.jobTitle !== undefined ? updates.jobTitle.trim() : (existing.jobTitle || 'Software Developer'),
+      avatarUrl: updates.avatarUrl || updates.profilePictureUrl || existing.avatarUrl,
+      profilePictureUrl: updates.profilePictureUrl || updates.avatarUrl || existing.profilePictureUrl,
+      linkedInUrl: updates.linkedInUrl !== undefined ? updates.linkedInUrl.trim() : existing.linkedInUrl,
+      gitHubUrl: updates.gitHubUrl !== undefined ? updates.gitHubUrl.trim() : existing.gitHubUrl,
+      // Immutable system attributes
+      learnerNumber: existing.learnerNumber,
+      workEmail: existing.workEmail,
+      programme: existing.programme,
+      role: existing.role,
+      status: existing.status,
+    };
+
+    setUsers((prev) => {
+      const next = prev.map((u) => (u.id === id ? updated : u));
+      try {
+        localStorage.setItem('smartregister_learners_v2', JSON.stringify(next));
+      } catch (e) {
+        console.warn('localStorage save failed', e);
+      }
+      return next;
+    });
+
+    setCurrentUser(updated);
+    return { success: true };
   };
 
   const toggleLearnerStatus = (id: string) => {
@@ -561,34 +757,231 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // GPS Controls
+  // GPS Controls & Verification
   const setCoordinatesPreset = (presetId: string) => {
     const preset = TEST_LOCATION_PRESETS.find((p) => p.id === presetId);
     if (preset) {
       setSelectedPresetId(presetId);
       setCurrentCoordinates(preset.coordinates);
-      setGpsAccuracyMeters(preset.coordinates.accuracy || 4);
+      const acc = preset.coordinates.accuracy || 4;
+      setGpsAccuracyMeters(acc);
+      const timestamp = activeTime.toISOString();
+      setLastLocationCapturedAt(timestamp);
+      const verification = verifyLocationAgainstWorkplace(preset.coordinates, workplaceConfig, timestamp);
+      setLocationVerificationResult(verification);
     }
   };
 
-  const useBrowserGeolocation = async (): Promise<boolean> => {
-    if (!navigator.geolocation) return false;
+  const captureAndVerifyLocation = useCallback(async (): Promise<LocationVerificationResult> => {
+    setIsCapturingLocation(true);
+    const timestamp = activeTime.toISOString();
+    setLastLocationCapturedAt(timestamp);
+
+    if (!navigator.geolocation) {
+      const fallback = verifyLocationAgainstWorkplace(currentCoordinates, workplaceConfig, timestamp);
+      const notSupportedResult: LocationVerificationResult = {
+        ...fallback,
+        status: 'error',
+        message: 'Geolocation API is not supported by your browser environment.',
+        errorCode: 'NOT_SUPPORTED',
+      };
+      setLocationVerificationResult(notSupportedResult);
+      setIsCapturingLocation(false);
+      return notSupportedResult;
+    }
+
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setSelectedPresetId('browser_gps');
-          setCurrentCoordinates({
+          const coords: Coordinates = {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             accuracy: pos.coords.accuracy,
-          });
-          setGpsAccuracyMeters(Math.round(pos.coords.accuracy));
-          resolve(true);
+          };
+          const acc = Math.round(pos.coords.accuracy);
+          setSelectedPresetId('browser_gps');
+          setCurrentCoordinates(coords);
+          setGpsAccuracyMeters(acc);
+
+          const verification = verifyLocationAgainstWorkplace(coords, workplaceConfig, timestamp);
+          setLocationVerificationResult(verification);
+          setIsCapturingLocation(false);
+          resolve(verification);
         },
-        () => resolve(false),
-        { enableHighAccuracy: true, timeout: 8000 }
+        (error) => {
+          let errMessage = 'Unable to acquire location signal.';
+          let errCode: LocationVerificationResult['errorCode'] = 'POSITION_UNAVAILABLE';
+
+          if (error.code === error.PERMISSION_DENIED) {
+            errMessage =
+              'Location permission denied. Please allow location permissions in your browser to verify physical presence.';
+            errCode = 'PERMISSION_DENIED';
+          } else if (error.code === error.TIMEOUT) {
+            errMessage =
+              'Location acquisition timed out. Please check your signal and click Retry Location.';
+            errCode = 'TIMEOUT';
+          }
+
+          const fallback = verifyLocationAgainstWorkplace(currentCoordinates, workplaceConfig, timestamp);
+          const errResult: LocationVerificationResult = {
+            ...fallback,
+            status: 'error',
+            message: errMessage,
+            errorCode: errCode,
+          };
+          setLocationVerificationResult(errResult);
+          setIsCapturingLocation(false);
+          resolve(errResult);
+        },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
       );
     });
+  }, [activeTime, currentCoordinates, workplaceConfig]);
+
+  const useBrowserGeolocation = async (): Promise<boolean> => {
+    const res = await captureAndVerifyLocation();
+    return res.status === 'success';
+  };
+
+  // Workplace Configuration Operations (Admin)
+  const updateWorkplaceConfig = (updates: Partial<WorkplaceOffice>, reason?: string) => {
+    setWorkplaceConfig((prev) => {
+      const nextConfig: WorkplaceOffice = {
+        ...prev,
+        ...updates,
+        coordinates: updates.coordinates
+          ? { ...prev.coordinates, ...updates.coordinates }
+          : prev.coordinates,
+        updatedAt: activeTime.toISOString(),
+        updatedBy: currentUser?.fullName || 'Administrator',
+      };
+
+      try {
+        localStorage.setItem('smartregister_workplace_config', JSON.stringify(nextConfig));
+      } catch (e) {
+        console.warn('Failed saving workplace config', e);
+      }
+
+      // Record audit log entry
+      const changes: WorkplaceAuditLog['changes'] = [];
+      if (updates.name !== undefined && updates.name !== prev.name) {
+        changes.push({ field: 'name', oldValue: prev.name, newValue: updates.name });
+      }
+      if (
+        updates.coordinates?.latitude !== undefined &&
+        updates.coordinates.latitude !== prev.coordinates.latitude
+      ) {
+        changes.push({
+          field: 'latitude',
+          oldValue: prev.coordinates.latitude,
+          newValue: updates.coordinates.latitude,
+        });
+      }
+      if (
+        updates.coordinates?.longitude !== undefined &&
+        updates.coordinates.longitude !== prev.coordinates.longitude
+      ) {
+        changes.push({
+          field: 'longitude',
+          oldValue: prev.coordinates.longitude,
+          newValue: updates.coordinates.longitude,
+        });
+      }
+      if (
+        updates.allowedRadiusMeters !== undefined &&
+        updates.allowedRadiusMeters !== prev.allowedRadiusMeters
+      ) {
+        changes.push({
+          field: 'allowedRadiusMeters',
+          oldValue: prev.allowedRadiusMeters,
+          newValue: updates.allowedRadiusMeters,
+        });
+      }
+      if (
+        updates.gpsAccuracyThresholdMeters !== undefined &&
+        updates.gpsAccuracyThresholdMeters !== prev.gpsAccuracyThresholdMeters
+      ) {
+        changes.push({
+          field: 'gpsAccuracyThresholdMeters',
+          oldValue: prev.gpsAccuracyThresholdMeters,
+          newValue: updates.gpsAccuracyThresholdMeters,
+        });
+      }
+      if (updates.isActive !== undefined && updates.isActive !== prev.isActive) {
+        changes.push({ field: 'isActive', oldValue: prev.isActive, newValue: updates.isActive });
+      }
+
+      if (changes.length > 0) {
+        const newLog: WorkplaceAuditLog = {
+          id: `log_${Date.now()}`,
+          timestamp: activeTime.toISOString(),
+          adminId: currentUser?.id || 'adm_001',
+          adminName: currentUser?.fullName || 'Thabo Mokoena (DVT Supervisor)',
+          action: 'UPDATE_COORDINATES',
+          details:
+            reason || `Updated authorized workplace parameters: ${changes.map((c) => c.field).join(', ')}`,
+          changes,
+        };
+        setWorkplaceAuditLogs((logs) => {
+          const nextLogs = [newLog, ...logs];
+          try {
+            localStorage.setItem('smartregister_workplace_audit_logs', JSON.stringify(nextLogs));
+          } catch (e) {
+            console.warn('Failed saving workplace audit logs', e);
+          }
+          return nextLogs;
+        });
+      }
+
+      // Re-verify current coordinates against new configuration
+      const rechecked = verifyLocationAgainstWorkplace(currentCoordinates, nextConfig, activeTime.toISOString());
+      setLocationVerificationResult(rechecked);
+
+      return nextConfig;
+    });
+  };
+
+  const resetWorkplaceConfig = () => {
+    setWorkplaceConfig(DEFAULT_WORKPLACE_OFFICE);
+    try {
+      localStorage.setItem('smartregister_workplace_config', JSON.stringify(DEFAULT_WORKPLACE_OFFICE));
+    } catch (e) {
+      console.warn('Failed resetting workplace config', e);
+    }
+    const resetLog: WorkplaceAuditLog = {
+      id: `log_${Date.now()}`,
+      timestamp: activeTime.toISOString(),
+      adminId: currentUser?.id || 'adm_001',
+      adminName: currentUser?.fullName || 'Thabo Mokoena (DVT Supervisor)',
+      action: 'RESET_DEFAULT',
+      details:
+        'Reset workplace coordinates and parameters to official DynamicDNA Campus defaults (-26.097841, 27.998357).',
+      changes: [
+        {
+          field: 'coordinates',
+          oldValue: 'Custom',
+          newValue: 'DynamicDNA Campus (-26.097841, 27.998357)',
+        },
+        { field: 'allowedRadiusMeters', oldValue: 'Custom', newValue: 100 },
+        { field: 'gpsAccuracyThresholdMeters', oldValue: 'Custom', newValue: 30 },
+      ],
+    };
+    setWorkplaceAuditLogs((logs) => {
+      const nextLogs = [resetLog, ...logs];
+      try {
+        localStorage.setItem('smartregister_workplace_audit_logs', JSON.stringify(nextLogs));
+      } catch (e) {
+        console.warn('Failed saving workplace audit logs', e);
+      }
+      return nextLogs;
+    });
+
+    const rechecked = verifyLocationAgainstWorkplace(
+      currentCoordinates,
+      DEFAULT_WORKPLACE_OFFICE,
+      activeTime.toISOString()
+    );
+    setLocationVerificationResult(rechecked);
   };
 
   const setSimulatedTime = (date: Date | null) => {
@@ -606,115 +999,100 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Clock-In logic
+  // Clock-In logic using Authoritative Verification Service
   const clockIn = (notes?: string): { success: boolean; message: string } => {
     if (!currentUser || currentUser.role !== 'learner') {
       return { success: false, message: 'Authentication required as a learner.' };
     }
 
-    if (systemControls.emergencyBroadcastActive) {
-      return { success: false, message: systemControls.emergencyMessage };
+    const verification = attendanceVerificationService.verifyClockIn({
+      learner: currentUser,
+      scheduleType: todayScheduleType,
+      coordinates: currentCoordinates,
+      capturedTimestamp: lastLocationCapturedAt || activeTime.toISOString(),
+      workplace: workplaceConfig,
+      existingRecords: attendanceRecords,
+      systemControls,
+      notes,
+      simulatedDate: activeTime,
+    });
+
+    if (!verification.success || !verification.record) {
+      return {
+        success: false,
+        message: verification.message,
+      };
     }
 
-    if (!systemControls.isClockInEnabled || systemControls.isAttendanceClosedToday) {
-      return { success: false, message: 'Clock-In is currently closed by the Administrator.' };
-    }
-
-    if (!workingDayStatus.isWorkingDay) {
-      return { success: false, message: workingDayStatus.message || 'Attendance is not required today.' };
-    }
-
-    if (hasClockedInToday) {
-      return { success: false, message: 'Attendance Already Registered For Today' };
-    }
-
-    // Check Office day vs WFH day requirements
-    if (todayScheduleType === 'office') {
-      if (!isLocationVerified) {
-        return {
-          success: false,
-          message:
-            'Attendance Denied. Today is an Office Day. You must be physically present at DynamicDNA.',
-        };
+    setAttendanceRecords((prev) => {
+      const nextRecords = [verification.record!, ...prev];
+      try {
+        localStorage.setItem('smartregister_attendance_records', JSON.stringify(nextRecords));
+      } catch (e) {
+        console.warn('Failed saving attendance records', e);
       }
-    } else {
-      if (!systemControls.isWfhAttendanceEnabled) {
-        return {
-          success: false,
-          message: 'Work From Home Attendance is disabled by the Administrator.',
-        };
-      }
-    }
+      return nextRecords;
+    });
 
-    const clockInEval = evaluateClockInStatus(activeTime);
-    if (!clockInEval.isOpen) {
-      return { success: false, message: clockInEval.message };
-    }
-
-    const accessId = dailyAccessId || generateDailyAccessId(activeTime, currentUser.id);
-    const clockInTimeString = activeTime.toTimeString().split(' ')[0];
-
-    const newRecord: AttendanceRecord = {
-      id: `att_${Date.now()}`,
-      learnerId: currentUser.id,
-      learnerNumber: currentUser.learnerNumber,
-      learnerName: currentUser.fullName,
-      date: todayDateString,
-      clockInTime: clockInTimeString,
-      status: clockInEval.status, // Strictly 'Present' or 'Late'
-      dayType: todayScheduleType,
-      verifiedDistanceMeters: todayScheduleType === 'office' ? distanceFromOffice : undefined,
-      accessId,
-      notes: notes || (todayScheduleType === 'office' ? 'Office Attendance' : 'WFH Attendance'),
-    };
-
-    setAttendanceRecords((prev) => [newRecord, ...prev]);
     return {
       success: true,
-      message: `Clock-In registered successfully at ${clockInTimeString}. Status: ${clockInEval.status}`,
+      message: verification.message,
     };
   };
 
-  // Clock-Out logic
+  // Clock-Out logic using Authoritative Verification Service
   const clockOut = (): { success: boolean; message: string } => {
     if (!currentUser || currentUser.role !== 'learner') {
       return { success: false, message: 'Authentication required.' };
-    }
-
-    if (!systemControls.isClockOutEnabled) {
-      return { success: false, message: 'Clock-Out is disabled by the Administrator.' };
     }
 
     if (!hasClockedInToday || !todayRecord) {
       return { success: false, message: 'Cannot clock out: No clock-in recorded for today.' };
     }
 
-    if (hasClockedOutToday) {
-      return { success: false, message: 'Clock-Out has already been registered for today.' };
+    const verification = attendanceVerificationService.verifyClockOut({
+      learner: currentUser,
+      existingRecord: todayRecord,
+      coordinates: currentCoordinates,
+      capturedTimestamp: activeTime.toISOString(),
+      workplace: workplaceConfig,
+      systemControls,
+      simulatedDate: activeTime,
+    });
+
+    if (!verification.success) {
+      return {
+        success: false,
+        message: verification.message,
+      };
     }
 
-    const clockOutEval = isClockOutAllowed(activeTime);
-    if (!clockOutEval.allowed) {
-      return { success: false, message: clockOutEval.message };
-    }
-
-    const clockOutTimeString = activeTime.toTimeString().split(' ')[0];
-
-    setAttendanceRecords((prev) =>
-      prev.map((rec) => {
+    setAttendanceRecords((prev) => {
+      const nextRecords = prev.map((rec) => {
         if (rec.id === todayRecord.id) {
           return {
             ...rec,
-            clockOutTime: clockOutTimeString,
+            clockOutTime: verification.clockOutTime,
+            clockOutTimestamp: verification.clockOutTimestamp,
+            clockOutDistance: verification.clockOutDistance,
+            clockOutGpsAccuracy: verification.clockOutGpsAccuracy,
+            clockOutLatitude: currentCoordinates.latitude,
+            clockOutLongitude: currentCoordinates.longitude,
           };
         }
         return rec;
-      })
-    );
+      });
+      try {
+        localStorage.setItem('smartregister_attendance_records', JSON.stringify(nextRecords));
+      } catch (e) {
+        console.warn('Failed saving attendance records', e);
+      }
+      return nextRecords;
+    });
 
     return {
       success: true,
-      message: `Clock-Out recorded successfully at ${clockOutTimeString}.`,
+      message: verification.message,
     };
   };
 
@@ -822,6 +1200,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         logout,
         registerLearnerProfile,
         updateProfileDetails,
+        updateLearnerProfile,
         toggleLearnerStatus,
         editLearner,
         currentTime: activeTime,
@@ -835,10 +1214,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         resetSchedule,
         getScheduleForDate,
         todayScheduleType,
+        workplaceConfig,
+        workplaceAuditLogs,
+        updateWorkplaceConfig,
+        resetWorkplaceConfig,
         currentCoordinates,
         selectedPresetId,
         setCoordinatesPreset,
         useBrowserGeolocation,
+        captureAndVerifyLocation,
+        locationVerificationResult,
+        isCapturingLocation,
+        lastLocationCapturedAt,
         distanceFromOffice,
         isLocationVerified,
         gpsAccuracyMeters,

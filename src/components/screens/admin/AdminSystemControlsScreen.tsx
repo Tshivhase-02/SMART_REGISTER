@@ -30,7 +30,7 @@ export const AdminSystemControlsScreen: React.FC = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* 1. Header */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
             <span>DVT Supervisory Authority</span>
@@ -56,7 +56,7 @@ export const AdminSystemControlsScreen: React.FC = () => {
       {/* 2. Control Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Clock-In Controls */}
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs font-bold text-slate-900 uppercase">Clock-In Terminal Status</h3>
@@ -203,7 +203,7 @@ export const AdminSystemControlsScreen: React.FC = () => {
               className={`flex-1 py-1.5 px-3 text-xs font-semibold rounded ${
                 !systemControls.isAttendanceClosedToday
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  : 'bg-[#0F4C81] hover:bg-[#0A355C] text-white'
+                  : 'bg-[#2F3E96] hover:bg-[#25327a] text-white'
               }`}
             >
               Reopen Attendance
@@ -212,7 +212,7 @@ export const AdminSystemControlsScreen: React.FC = () => {
         </div>
 
         {/* Work From Home Attendance Override */}
-        <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs space-y-3">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-xs font-bold text-slate-900 uppercase">WFH Attendance Channel</h3>
@@ -265,12 +265,12 @@ export const AdminSystemControlsScreen: React.FC = () => {
       </div>
 
       {/* 3. Convert Today's Schedule Mode (Office <-> WFH) */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs space-y-3">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs space-y-3">
         <h3 className="text-xs font-bold text-slate-900 uppercase pb-2 border-b border-slate-100">
           Instant Daily Schedule Conversion
         </h3>
         <p className="text-xs text-slate-600">
-          Current schedule designated for today: <strong className="uppercase font-mono text-[#0F4C81]">{todayScheduleType}</strong>. Switch immediately if weather or transport disruption occurs.
+          Current schedule designated for today: <strong className="uppercase font-mono text-[#2F3E96]">{todayScheduleType}</strong>. Switch immediately if weather or transport disruption occurs.
         </p>
 
         <div className="flex gap-3 pt-1">
@@ -279,10 +279,10 @@ export const AdminSystemControlsScreen: React.FC = () => {
               convertTodaySchedule('wfh');
               showFeedback("Converted today's schedule to Work From Home (WFH).");
             }}
-            className={`flex-1 py-2 px-3 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors ${
+            className={`flex-1 py-2 px-3 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors cursor-pointer ${
               todayScheduleType === 'wfh'
                 ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
-                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                : 'bg-white border-[#E5E7EB] text-slate-700 hover:bg-slate-50'
             }`}
           >
             <Home className="w-4 h-4 text-emerald-600" />
@@ -294,13 +294,13 @@ export const AdminSystemControlsScreen: React.FC = () => {
               convertTodaySchedule('office');
               showFeedback("Converted today's schedule to Office (Requires 100m GPS).");
             }}
-            className={`flex-1 py-2 px-3 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors ${
+            className={`flex-1 py-2 px-3 rounded text-xs font-semibold flex items-center justify-center gap-1.5 border transition-colors cursor-pointer ${
               todayScheduleType === 'office'
-                ? 'bg-blue-50 border-[#0F4C81] text-[#0F4C81]'
-                : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                ? 'bg-blue-50 border-[#2F3E96] text-[#2F3E96]'
+                : 'bg-white border-[#E5E7EB] text-slate-700 hover:bg-slate-50'
             }`}
           >
-            <Building className="w-4 h-4 text-[#0F4C81]" />
+            <Building className="w-4 h-4 text-[#2F3E96]" />
             <span>Convert WFH Day To Office</span>
           </button>
         </div>

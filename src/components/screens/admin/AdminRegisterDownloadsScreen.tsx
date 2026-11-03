@@ -142,42 +142,42 @@ export const AdminRegisterDownloadsScreen: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 text-white rounded text-xs font-semibold hover:bg-slate-800 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-[#2F3E96] hover:bg-[#25327B] text-white rounded text-xs font-semibold transition-colors shadow-xs"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print A4 Portrait Register</span>
+            <span>Generate & Print PDF Register</span>
           </button>
           <button
             onClick={() => handleExportCsv('excel')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-emerald-700 text-white rounded text-xs font-semibold hover:bg-emerald-800 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#F4B52C] hover:bg-[#E0A220] text-white rounded text-xs font-semibold transition-colors shadow-xs"
           >
             <FileSpreadsheet className="w-3.5 h-3.5" />
             <span>Excel (.CSV)</span>
           </button>
           <button
             onClick={() => handleExportCsv('csv')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded text-xs font-semibold hover:bg-slate-50 transition-colors shadow-xs"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-[#E5E7EB] text-[#2F3E96] hover:bg-slate-50 rounded text-xs font-semibold transition-colors shadow-xs"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>CSV</span>
+            <span>Download CSV</span>
           </button>
         </div>
       </div>
 
       {/* 2. Configuration & Period Selection Bar (Hidden during print) */}
-      <div className="print:hidden bg-white border border-slate-200 rounded-lg p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+      <div className="print:hidden bg-white border border-[#E5E7EB] rounded-lg p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-2 w-full md:w-auto">
-          <span className="font-bold text-slate-700 uppercase tracking-wide text-[10px]">
+          <span className="font-bold text-[#333333] uppercase tracking-wide text-[10px]">
             Period:
           </span>
-          <div className="flex items-center bg-slate-100 p-1 rounded border border-slate-200">
+          <div className="flex items-center bg-[#F5F5F5] p-1 rounded border border-[#E5E7EB]">
             {(['daily', 'weekly', 'monthly', 'custom'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPeriod(p)}
                 className={`px-3 py-1 rounded capitalize font-medium transition-colors ${
                   period === p
-                    ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                    ? 'bg-[#F4B52C] text-[#2F3E96] shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -232,45 +232,54 @@ export const AdminRegisterDownloadsScreen: React.FC = () => {
               pageBreakAfter: 'always',
             }}
           >
-            {/* Register Header */}
-            <div className="border-b-2 border-slate-900 pb-3 mb-4 flex justify-between items-start">
-              <div>
-                <p className="font-bold text-base text-slate-900 tracking-tight">
-                  DynamicDNA | DVT Learnership Programme
-                </p>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900 uppercase mt-0.5">
-                  ATTENDANCE REGISTER
-                </h1>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  Period: <span className="font-semibold text-slate-900 uppercase">{period} register</span> ({eligibleWorkingDates[0]} to {eligibleWorkingDates[eligibleWorkingDates.length - 1]})
-                </p>
+            {/* Register Header with Official DynamicDNA Logo */}
+            <div className="border-b-2 border-[#2F3E96] pb-3 mb-4 flex justify-between items-start">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/dynamicdna-logo.png"
+                  alt="DynamicDNA"
+                  className="h-12 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="h-10 w-px bg-[#E5E7EB]" />
+                <div>
+                  <p className="font-bold text-sm text-[#2F3E96] tracking-tight">
+                    DynamicDNA | DVT Learnership Programme
+                  </p>
+                  <h1 className="text-lg font-bold tracking-tight text-[#333333] uppercase mt-0.5">
+                    ATTENDANCE REGISTER
+                  </h1>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    Period: <span className="font-semibold text-slate-900 uppercase">{period} register</span> ({eligibleWorkingDates[0]} to {eligibleWorkingDates[eligibleWorkingDates.length - 1]})
+                  </p>
+                </div>
               </div>
 
               <div className="text-right text-xs">
-                <span className="font-mono font-bold text-slate-900 block">
+                <span className="font-mono font-bold text-[#2F3E96] block">
                   PAGE {pageIdx + 1} OF {datePages.length}
                 </span>
                 <span className="text-[10px] text-slate-500 uppercase block">
                   A4 Portrait Layout
                 </span>
                 <span className="text-[10px] text-slate-500 block">
-                  Workplace Centroid: -26.097841, 27.998357
+                  Workplace: DynamicDNA Sandton
                 </span>
               </div>
             </div>
 
-            {/* Matrix Table with Learner Names repeated on every page */}
-            <div className="border border-slate-900 overflow-hidden mb-6">
+            {/* Matrix Table with Table Header: Background #2F3E96, Text: White */}
+            <div className="border border-[#2F3E96] overflow-hidden mb-6 rounded-xs">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-100 border-b-2 border-slate-900 font-bold text-slate-900">
-                    <th className="py-2.5 px-3 border-r border-slate-400 w-1/3">
+                  <tr className="bg-[#2F3E96] border-b border-[#2F3E96] font-bold text-white">
+                    <th className="py-2.5 px-3 border-r border-[#2F3E96]/40 w-1/3 text-white">
                       Learner Name
                     </th>
                     {pageDates.map((dateStr) => (
                       <th
                         key={dateStr}
-                        className="py-2.5 px-3 border-r border-slate-400 text-center font-mono text-xs"
+                        className="py-2.5 px-3 border-r border-[#2F3E96]/40 text-center font-mono text-xs text-white"
                       >
                         {formatDateHeader(dateStr)}
                       </th>

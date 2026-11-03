@@ -78,7 +78,7 @@ export const LearnerReportAbsenceScreen: React.FC = () => {
                 required
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none"
+                className="w-full px-3 py-1.5 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none"
               />
             </div>
 
@@ -89,7 +89,7 @@ export const LearnerReportAbsenceScreen: React.FC = () => {
               <select
                 value={reason}
                 onChange={(e) => setReason(e.target.value as AbsenceReason)}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none bg-white"
+                className="w-full px-3 py-1.5 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none bg-white"
               >
                 {REASON_OPTIONS.map((r) => (
                   <option key={r} value={r}>
@@ -109,13 +109,14 @@ export const LearnerReportAbsenceScreen: React.FC = () => {
                 placeholder="Provide details regarding the reason for absence..."
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                className="w-full px-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none"
+                className="w-full px-3 py-1.5 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none"
               />
             </div>
 
+            {/* Primary Button: #F4B52C, Text: White */}
             <button
               type="submit"
-              className="w-full py-2.5 px-4 bg-[#0F4C81] hover:bg-[#0A355C] text-white font-semibold rounded transition-colors flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-[#F4B52C] hover:bg-[#E0A220] text-white font-semibold rounded transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
             >
               <Send className="w-3.5 h-3.5" />
               <span>Submit Absence Request</span>

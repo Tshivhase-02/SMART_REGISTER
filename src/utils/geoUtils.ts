@@ -1,7 +1,15 @@
-import { AttendanceStatus, Coordinates, WorkplaceOffice } from '../types/attendance';
+import {
+  AttendanceRecord,
+  AttendanceStatus,
+  Coordinates,
+  LocationVerificationResult,
+  TerminalAttendanceState,
+  WorkplaceOffice,
+} from '../types/attendance';
 
-export const DYNAMIC_DNA_OFFICE: WorkplaceOffice = {
-  name: 'DynamicDNA',
+export const DEFAULT_WORKPLACE_OFFICE: WorkplaceOffice = {
+  id: 'wp_dynamic_dna_campus',
+  name: 'DynamicDNA Campus',
   organization: 'DynamicDNA',
   programme: 'DVT Learnership Programme',
   coordinates: {
@@ -9,7 +17,12 @@ export const DYNAMIC_DNA_OFFICE: WorkplaceOffice = {
     longitude: 27.998357,
   },
   allowedRadiusMeters: 100,
+  gpsAccuracyThresholdMeters: 30, // 30 meters maximum acceptable accuracy
+  isActive: true,
 };
+
+// Backwards-compatible export
+export const DYNAMIC_DNA_OFFICE: WorkplaceOffice = DEFAULT_WORKPLACE_OFFICE;
 
 // South African Statutory Public Holidays (YYYY-MM-DD)
 export const SA_PUBLIC_HOLIDAYS_2026: Record<string, string> = {
@@ -29,7 +42,77 @@ export const SA_PUBLIC_HOLIDAYS_2026: Record<string, string> = {
 };
 
 /**
+ * Authoritative South African Standard Time (SAST, UTC+2 / Africa/Johannesburg) Component Extractor.
+ * Guarantees zero local browser/server timezone drift.
+ */
+export function getSASTComponents(date: Date = new Date()): {
+  year: number;
+  month: number;
+  day: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  timeString: string;
+  dateString: string;
+  formattedDisplay: string;
+} {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(date);
+  const partMap: Record<string, string> = {};
+  for (const p of parts) {
+    partMap[p.type] = p.value;
+  }
+
+  const year = parseInt(partMap.year, 10);
+  const month = parseInt(partMap.month, 10);
+  const day = parseInt(partMap.day, 10);
+  const hours = parseInt(partMap.hour, 10);
+  const minutes = parseInt(partMap.minute, 10);
+  const seconds = parseInt(partMap.second, 10);
+  const timeString = `${partMap.hour}:${partMap.minute}:${partMap.second}`;
+  const dateString = `${partMap.year}-${partMap.month}-${partMap.day}`;
+  const formattedDisplay = `${timeString} SAST`;
+
+  return {
+    year,
+    month,
+    day,
+    hours,
+    minutes,
+    seconds,
+    timeString,
+    dateString,
+    formattedDisplay,
+  };
+}
+
+/**
+ * Formats time in HH:mm:ss SAST
+ */
+export function formatSASTTime(date: Date = new Date()): string {
+  return getSASTComponents(date).timeString;
+}
+
+/**
+ * Formats date in YYYY-MM-DD in Africa/Johannesburg
+ */
+export function formatSASTDate(date: Date = new Date()): string {
+  return getSASTComponents(date).dateString;
+}
+
+/**
  * Calculates distance in meters between two GPS coordinates using Haversine formula
+ * Earth radius: 6,371,000 meters
  */
 export function calculateDistanceMeters(coord1: Coordinates, coord2: Coordinates): number {
   const R = 6371e3; // Earth radius in meters
@@ -48,8 +131,8 @@ export function calculateDistanceMeters(coord1: Coordinates, coord2: Coordinates
 
 export function isWithinGeofence(
   userCoord: Coordinates,
-  officeCoord: Coordinates = DYNAMIC_DNA_OFFICE.coordinates,
-  maxRadius: number = DYNAMIC_DNA_OFFICE.allowedRadiusMeters
+  officeCoord: Coordinates = DEFAULT_WORKPLACE_OFFICE.coordinates,
+  maxRadius: number = DEFAULT_WORKPLACE_OFFICE.allowedRadiusMeters
 ): { isWithin: boolean; distance: number } {
   const distance = calculateDistanceMeters(userCoord, officeCoord);
   return {
@@ -59,7 +142,82 @@ export function isWithinGeofence(
 }
 
 /**
+ * Verifies user coordinates against authorized workplace parameters.
+ */
+export function verifyLocationAgainstWorkplace(
+  coords: Coordinates,
+  workplace: WorkplaceOffice = DEFAULT_WORKPLACE_OFFICE,
+  timestamp?: string
+): LocationVerificationResult {
+  const capturedAt = timestamp || new Date().toISOString();
+
+  if (!workplace.isActive) {
+    return {
+      status: 'error',
+      coordinates: coords,
+      capturedAt,
+      isWithinGeofence: false,
+      isAccuracyAcceptable: false,
+      message: 'Workplace attendance is temporarily inactive in system controls.',
+      errorCode: 'INACTIVE_WORKPLACE',
+    };
+  }
+
+  const distance = calculateDistanceMeters(coords, workplace.coordinates);
+  const accuracy = Math.round(coords.accuracy ?? 10);
+  const isAccuracyAcceptable = accuracy <= workplace.gpsAccuracyThresholdMeters;
+  const isWithinGeofence = distance <= workplace.allowedRadiusMeters;
+
+  if (!isAccuracyAcceptable) {
+    return {
+      status: 'warning',
+      coordinates: coords,
+      capturedAt,
+      distanceMeters: distance,
+      allowedRadiusMeters: workplace.allowedRadiusMeters,
+      gpsAccuracyMeters: accuracy,
+      accuracyThresholdMeters: workplace.gpsAccuracyThresholdMeters,
+      isWithinGeofence,
+      isAccuracyAcceptable: false,
+      message: `GPS accuracy is ${accuracy}m (Threshold: ${workplace.gpsAccuracyThresholdMeters}m). Accuracy insufficient. Move closer to a window or outdoors to improve satellite lock.`,
+      errorCode: 'ACCURACY_POOR',
+    };
+  }
+
+  if (!isWithinGeofence) {
+    const diff = distance - workplace.allowedRadiusMeters;
+    return {
+      status: 'error',
+      coordinates: coords,
+      capturedAt,
+      distanceMeters: distance,
+      allowedRadiusMeters: workplace.allowedRadiusMeters,
+      gpsAccuracyMeters: accuracy,
+      accuracyThresholdMeters: workplace.gpsAccuracyThresholdMeters,
+      isWithinGeofence: false,
+      isAccuracyAcceptable: true,
+      message: `Outside authorised workplace area. Distance: ${distance}m (Allowed: ${workplace.allowedRadiusMeters}m, exceeded by ${diff}m). Physical presence at ${workplace.name} required.`,
+      errorCode: 'OUTSIDE_RADIUS',
+    };
+  }
+
+  return {
+    status: 'success',
+    coordinates: coords,
+    capturedAt,
+    distanceMeters: distance,
+    allowedRadiusMeters: workplace.allowedRadiusMeters,
+    gpsAccuracyMeters: accuracy,
+    accuracyThresholdMeters: workplace.gpsAccuracyThresholdMeters,
+    isWithinGeofence: true,
+    isAccuracyAcceptable: true,
+    message: `Authorised radius: ${workplace.allowedRadiusMeters} metres. Learner distance: ${distance} metres. Result: LOCATION VERIFIED.`,
+  };
+}
+
+/**
  * Checks if a given date is a working day (Monday - Friday) and not a public holiday
+ * Authoritative Africa/Johannesburg day check.
  */
 export function evaluateWorkingDay(date: Date = new Date()): {
   isWorkingDay: boolean;
@@ -68,10 +226,12 @@ export function evaluateWorkingDay(date: Date = new Date()): {
   holidayName?: string;
   message?: string;
 } {
-  const dayOfWeek = date.getDay(); // 0 is Sunday, 6 is Saturday
+  const { year, month, day, dateString } = getSASTComponents(date);
+  // Construct UTC timestamp matching SAST calendar date at noon to determine day-of-week safely
+  const sastDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const dayOfWeek = sastDate.getUTCDay(); // 0 is Sunday, 6 is Saturday
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
 
-  const dateString = date.toISOString().split('T')[0];
   const holidayName = SA_PUBLIC_HOLIDAYS_2026[dateString];
   const isPublicHoliday = Boolean(holidayName);
 
@@ -102,10 +262,10 @@ export function evaluateWorkingDay(date: Date = new Date()): {
 }
 
 /**
- * Evaluates Clock-In status based on time:
- * Clock-In opens: 07:15
- * Present: 07:15 - 09:00
- * Late: After 09:00
+ * Evaluates Clock-In status based on South African Standard Time:
+ * Clock-In opens: 07:15 SAST
+ * Present: 07:15 - 09:00 SAST
+ * Late: After 09:00 SAST
  */
 export function evaluateClockInStatus(date: Date = new Date()): {
   isOpen: boolean;
@@ -113,8 +273,7 @@ export function evaluateClockInStatus(date: Date = new Date()): {
   message: string;
   timeString: string;
 } {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
+  const { hours, minutes, timeString } = getSASTComponents(date);
   const timeInMinutes = hours * 60 + minutes;
 
   // 07:15 = 7*60 + 15 = 435 minutes
@@ -122,13 +281,11 @@ export function evaluateClockInStatus(date: Date = new Date()): {
   const openTime = 7 * 60 + 15;
   const lateTime = 9 * 60;
 
-  const timeString = date.toTimeString().split(' ')[0];
-
   if (timeInMinutes < openTime) {
     return {
       isOpen: false,
       status: 'Present',
-      message: 'Clock-In opens at 07:15.',
+      message: 'Clock-In opens at 07:15 SAST.',
       timeString,
     };
   } else if (timeInMinutes <= lateTime) {
@@ -149,19 +306,28 @@ export function evaluateClockInStatus(date: Date = new Date()): {
 }
 
 /**
- * Evaluates whether Clock Out is permitted (from 15:15)
+ * Evaluates whether Clock Out is permitted (from 15:15 SAST).
+ * Strictly enforced in Africa/Johannesburg timezone.
+ *
+ * Rules & Test Cases:
+ * 12:00 -> false
+ * 12:36 -> false
+ * 14:59 -> false
+ * 15:14 -> false
+ * 15:15 -> true
+ * 15:40 -> true
  */
 export function isClockOutAllowed(date: Date = new Date()): {
   allowed: boolean;
   thresholdTimeString: string;
   minutesRemaining: number;
+  sastTimeString: string;
   message: string;
 } {
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
+  const { hours, minutes, timeString } = getSASTComponents(date);
   const timeInMinutes = hours * 60 + minutes;
 
-  // 15:15 = 15 * 60 + 15 = 915 minutes
+  // 15:15 SAST = 15 * 60 + 15 = 915 minutes
   const clockOutThreshold = 15 * 60 + 15;
 
   if (timeInMinutes >= clockOutThreshold) {
@@ -169,31 +335,60 @@ export function isClockOutAllowed(date: Date = new Date()): {
       allowed: true,
       thresholdTimeString: '15:15',
       minutesRemaining: 0,
+      sastTimeString: timeString,
       message: 'Clock-out is enabled.',
     };
   }
 
+  const minutesRemaining = clockOutThreshold - timeInMinutes;
+
   return {
     allowed: false,
     thresholdTimeString: '15:15',
-    minutesRemaining: clockOutThreshold - timeInMinutes,
-    message: 'Clock-Out Available From 15:15',
+    minutesRemaining,
+    sastTimeString: timeString,
+    message: 'Clock-out is not available yet. You may clock out from 15:15.',
   };
 }
 
 /**
+ * Derives the Authoritative Terminal Attendance State:
+ * - NOT_CLOCKED_IN: No clock-in recorded for today
+ * - CLOCK_OUT_PENDING: Clock-in recorded, shift in progress before 15:15 SAST
+ * - CLOCKED_IN: Clock-in recorded, 15:15 reached, departure clock-out available
+ * - COMPLETED: Clock-out successfully recorded & persisted in attendance ledger
+ */
+export function deriveAttendanceState(
+  todayRecord: AttendanceRecord | null,
+  activeDate: Date = new Date()
+): TerminalAttendanceState {
+  if (!todayRecord || !todayRecord.clockInTime) {
+    return 'NOT_CLOCKED_IN';
+  }
+  if (todayRecord.clockOutTime) {
+    return 'COMPLETED';
+  }
+  const clockOutEval = isClockOutAllowed(activeDate);
+  if (!clockOutEval.allowed) {
+    return 'CLOCK_OUT_PENDING';
+  }
+  return 'CLOCKED_IN';
+}
+
+/**
  * Generates Daily Access ID
- * Example format: SR-20261102-X7K4Q
+ * Example format: SR-20261103-W9Q4A
  */
 export function generateDailyAccessId(date: Date = new Date(), seed: string = ''): string {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, '0');
-  const dd = String(date.getDate()).padStart(2, '0');
+  const { year, month, day } = getSASTComponents(date);
+  const yyyy = year.toString();
+  const mm = String(month).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
   const dateSegment = `${yyyy}${mm}${dd}`;
 
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let randPart = '';
-  // Combine random chars with seed
+  // Combine random chars
   for (let i = 0; i < 5; i++) {
     const idx = Math.floor(Math.random() * chars.length);
     randPart += chars[idx];

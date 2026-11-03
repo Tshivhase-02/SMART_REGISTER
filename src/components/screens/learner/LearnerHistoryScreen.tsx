@@ -49,14 +49,14 @@ export const LearnerHistoryScreen: React.FC = () => {
         </div>
 
         {/* Filters: Daily, Weekly, Monthly */}
-        <div className="flex items-center bg-slate-100 p-1 rounded border border-slate-200 text-xs">
+        <div className="flex items-center bg-slate-100 p-1 rounded border border-[#E5E7EB] text-xs">
           {(['daily', 'weekly', 'monthly'] as const).map((filter) => (
             <button
               key={filter}
               onClick={() => setTimeFilter(filter)}
-              className={`px-3 py-1 rounded capitalize font-medium transition-colors ${
+              className={`px-3 py-1 rounded capitalize font-medium transition-colors cursor-pointer ${
                 timeFilter === filter
-                  ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                  ? 'bg-[#F4B52C] text-[#2F3E96] shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -67,28 +67,29 @@ export const LearnerHistoryScreen: React.FC = () => {
       </div>
 
       {/* 2. Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-[10px] font-semibold tracking-wider">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-[#2F3E96] text-white uppercase text-[10px] font-semibold tracking-wider">
               <tr>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Clock-In</th>
                 <th className="py-3 px-4">Clock-Out</th>
+                <th className="py-3 px-4">GPS Verification</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4">Daily Access ID</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-800">
+            <tbody className="divide-y divide-[#E5E7EB] text-slate-800">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400">
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
                     No attendance records logged for the selected period.
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={rec.id} className="hover:bg-[#F4B52C]/10 transition-colors">
                     <td className="py-3 px-4 font-mono font-medium text-slate-900 whitespace-nowrap">
                       {rec.date}
                     </td>
@@ -109,19 +110,33 @@ export const LearnerHistoryScreen: React.FC = () => {
                       )}
                     </td>
 
+                    <td className="py-3 px-4 font-mono text-[11px] whitespace-nowrap">
+                      {rec.verifiedDistanceMeters !== undefined ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          {rec.verifiedDistanceMeters}m (Office)
+                        </span>
+                      ) : rec.dayType === 'wfh' ? (
+                        <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          WFH Exempt
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1 font-semibold text-[11px] uppercase ${
+                        className={`inline-flex items-center gap-1 font-semibold text-[11px] uppercase px-2 py-0.5 rounded ${
                           rec.status === 'Present'
-                            ? 'text-emerald-700'
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                             : rec.status === 'Late'
-                            ? 'text-amber-700'
-                            : 'text-rose-700'
+                            ? 'bg-[#F4B52C]/20 text-slate-900 border border-[#F4B52C]/50 font-bold'
+                            : 'bg-rose-50 text-rose-800 border border-rose-200'
                         }`}
                       >
-                        {rec.status === 'Present' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        {rec.status === 'Late' && <Clock className="w-3.5 h-3.5" />}
-                        {rec.status === 'Absent' && <AlertTriangle className="w-3.5 h-3.5" />}
+                        {rec.status === 'Present' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                        {rec.status === 'Late' && <Clock className="w-3.5 h-3.5 text-[#2F3E96]" />}
+                        {rec.status === 'Absent' && <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />}
                         <span>{rec.status}</span>
                       </span>
                     </td>

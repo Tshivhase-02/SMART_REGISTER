@@ -2,21 +2,24 @@
 
 @layer base {
   :root {
-    --primary: #0F4C81;
-    --primary-dark: #0A355C;
-    --primary-light: #EBF3FA;
-    --navy: #1F2937;
-    --success: #16A34A;
-    --warning: #F59E0B;
-    --danger: #DC2626;
-    --bg-page: #F5F7FA;
+    --primary-gold: #F4B52C;
+    --primary-gold-hover: #E0A220;
+    --primary-blue: #2F3E96;
+    --primary-blue-hover: #25327B;
+    --bg-page: #F5F5F5;
     --card-bg: #FFFFFF;
+    --primary-text: #333333;
+    --border-color: #E5E7EB;
+
+    --success: #16A34A;
+    --warning-gold: #F4B52C;
+    --danger: #DC2626;
   }
 
   body {
     font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background-color: #F5F7FA;
-    color: #1F2937;
+    background-color: #F5F5F5;
+    color: #333333;
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;

@@ -11,6 +11,7 @@ import { LearnerAttendanceScreen } from './components/screens/learner/LearnerAtt
 import { LearnerHistoryScreen } from './components/screens/learner/LearnerHistoryScreen';
 import { LearnerReportAbsenceScreen } from './components/screens/learner/LearnerReportAbsenceScreen';
 import { LearnerProfileScreen } from './components/screens/learner/LearnerProfileScreen';
+import { LearnerDirectoryScreen } from './components/screens/learner/LearnerDirectoryScreen';
 
 // Admin screens
 import { AdminDashboard } from './components/screens/admin/AdminDashboard';
@@ -60,6 +61,8 @@ const MainLayout: React.FC = () => {
           return <LearnerHistoryScreen />;
         case 'learner_report_absence':
           return <LearnerReportAbsenceScreen />;
+        case 'learner_directory':
+          return <LearnerDirectoryScreen />;
         case 'learner_profile':
           return <LearnerProfileScreen />;
         default:
@@ -95,7 +98,7 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] flex flex-col text-slate-800 antialiased selection:bg-[#0F4C81] selection:text-white">
+    <div className="min-h-screen bg-[#F5F5F5] flex flex-col text-[#333333] antialiased selection:bg-[#F4B52C] selection:text-[#2F3E96]">
       {/* Top Navigation Bar (Hidden during print) */}
       <div className="print:hidden">
         <Navbar onOpenCreateProfileModal={() => setIsCreateProfileOpen(true)} />
@@ -110,7 +113,7 @@ const MainLayout: React.FC = () => {
             </span>
             <button
               onClick={() => setIsMobileDeviceView(false)}
-              className="text-[#0F4C81] font-semibold hover:underline"
+              className="text-[#2F3E96] font-semibold hover:underline"
             >
               Exit Mobile View
             </button>
@@ -123,7 +126,7 @@ const MainLayout: React.FC = () => {
             </div>
 
             {/* Scrollable Screen Content */}
-            <div className="flex-1 overflow-y-auto p-4 pb-20 bg-[#F5F7FA] print:bg-white print:p-0">
+            <div className="flex-1 overflow-y-auto p-4 pb-20 bg-[#F5F5F5] print:bg-white print:p-0">
               {renderActiveScreen()}
             </div>
 

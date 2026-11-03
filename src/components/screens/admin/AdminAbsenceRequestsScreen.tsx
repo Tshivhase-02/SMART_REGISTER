@@ -30,14 +30,14 @@ export const AdminAbsenceRequestsScreen: React.FC = () => {
         </div>
 
         {/* Filter */}
-        <div className="flex items-center bg-slate-100 p-1 rounded border border-slate-200 text-xs">
+        <div className="flex items-center bg-slate-100 p-1 rounded border border-[#E5E7EB] text-xs">
           {(['all', 'Pending', 'Approved', 'Rejected'] as const).map((status) => (
             <button
               key={status}
               onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1 rounded capitalize font-medium transition-colors ${
+              className={`px-3 py-1 rounded capitalize font-medium transition-colors cursor-pointer ${
                 filterStatus === status
-                  ? 'bg-white text-slate-900 shadow-xs font-semibold'
+                  ? 'bg-[#F4B52C] text-[#2F3E96] shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -48,10 +48,10 @@ export const AdminAbsenceRequestsScreen: React.FC = () => {
       </div>
 
       {/* 2. Requests Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-[10px] font-semibold tracking-wider">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-[#2F3E96] text-white uppercase text-[10px] font-semibold tracking-wider">
               <tr>
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Learner Number</th>
@@ -62,7 +62,7 @@ export const AdminAbsenceRequestsScreen: React.FC = () => {
                 <th className="py-3 px-4 text-right">Review Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 text-slate-800">
+            <tbody className="divide-y divide-[#E5E7EB] text-slate-800">
               {filteredRequests.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-8 text-center text-slate-400">
@@ -71,7 +71,7 @@ export const AdminAbsenceRequestsScreen: React.FC = () => {
                 </tr>
               ) : (
                 filteredRequests.map((req) => (
-                  <tr key={req.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={req.id} className="hover:bg-[#F4B52C]/10 transition-colors">
                     <td className="py-3 px-4 font-mono font-medium text-slate-900 whitespace-nowrap">
                       {req.date}
                     </td>
@@ -99,12 +99,12 @@ export const AdminAbsenceRequestsScreen: React.FC = () => {
                             ? 'bg-emerald-100 text-emerald-800'
                             : req.status === 'Rejected'
                             ? 'bg-rose-100 text-rose-800'
-                            : 'bg-amber-100 text-amber-800'
+                            : 'bg-[#F4B52C]/20 text-[#2F3E96] border border-[#F4B52C]/50'
                         }`}
                       >
                         {req.status === 'Approved' && <CheckCircle2 className="w-3.5 h-3.5" />}
                         {req.status === 'Rejected' && <XCircle className="w-3.5 h-3.5" />}
-                        {req.status === 'Pending' && <Clock className="w-3.5 h-3.5" />}
+                        {req.status === 'Pending' && <Clock className="w-3.5 h-3.5 text-[#2F3E96]" />}
                         <span>{req.status}</span>
                       </span>
                     </td>

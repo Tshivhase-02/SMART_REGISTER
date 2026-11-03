@@ -27,6 +27,7 @@ export const Sidebar: React.FC = () => {
     currentUser,
     todayScheduleType,
     hasClockedInToday,
+    hasClockedOutToday,
     todayRecord,
     dailyAccessId,
     isDailyAccessVerified,
@@ -37,16 +38,34 @@ export const Sidebar: React.FC = () => {
   const isAdmin = currentUser?.role === 'admin';
 
   const navItemClass = (id: ScreenId) =>
-    `flex items-center justify-between w-full px-3 py-2 text-xs font-medium rounded transition-colors text-left ${
+    `flex items-center justify-between w-full px-3 py-2.5 text-xs rounded-md transition-colors text-left ${
       activeScreen === id
-        ? 'bg-[#0F4C81] text-white shadow-xs font-semibold'
-        : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900'
+        ? 'bg-[#F4B52C] text-[#2F3E96] shadow-xs font-bold'
+        : 'text-[#333333] hover:bg-slate-50 hover:text-[#2F3E96] font-medium'
     }`;
 
   return (
-    <aside className="w-60 bg-white border-r border-slate-200 flex flex-col shrink-0 min-h-[calc(100vh-3.5rem)] select-none">
-      {/* Shift Overview Pill / Status Card */}
-      <div className="p-3 m-3 bg-slate-50 border border-slate-200 rounded text-xs">
+    <aside className="w-60 bg-white border-r border-[#E5E7EB] flex flex-col shrink-0 min-h-[calc(100vh-3.5rem)] select-none">
+      {/* DynamicDNA Official Brand Header in Sidebar */}
+      <div className="p-3.5 border-b border-[#E5E7EB] flex items-center gap-2.5 bg-white">
+        <img
+          src="/dynamicdna-logo.png"
+          alt="DynamicDNA"
+          className="h-9 w-auto object-contain shrink-0"
+          referrerPolicy="no-referrer"
+        />
+        <div className="flex flex-col">
+          <span className="text-xs font-bold text-[#333333] leading-none">
+            SmartRegister
+          </span>
+          <span className="text-[10px] font-semibold text-[#2F3E96] mt-0.5">
+            DVT Programme
+          </span>
+        </div>
+      </div>
+
+      {/* Shift Overview Card */}
+      <div className="p-3 m-3 bg-[#F5F5F5] border border-[#E5E7EB] rounded-md text-xs">
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
             {isLearner ? "Today's Schedule" : 'Active Session'}
@@ -54,8 +73,8 @@ export const Sidebar: React.FC = () => {
           <span
             className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
               todayScheduleType === 'office'
-                ? 'bg-blue-100 text-[#0F4C81]'
-                : 'bg-emerald-100 text-emerald-800'
+                ? 'bg-blue-100 text-[#2F3E96]'
+                : 'bg-amber-100 text-amber-900'
             }`}
           >
             {todayScheduleType === 'office' ? 'Office' : 'WFH'}
@@ -64,14 +83,22 @@ export const Sidebar: React.FC = () => {
 
         {isLearner && (
           <>
-            <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-slate-200">
+            <div className="flex items-center justify-between text-[11px] text-slate-600 pt-1 border-t border-[#E5E7EB]">
               <span>Attendance:</span>
               <span
                 className={`font-semibold ${
-                  hasClockedInToday ? 'text-emerald-700' : 'text-amber-700'
+                  hasClockedOutToday
+                    ? 'text-emerald-700 font-bold'
+                    : hasClockedInToday
+                    ? 'text-blue-700'
+                    : 'text-amber-700'
                 }`}
               >
-                {hasClockedInToday ? todayRecord?.status : 'Not Clocked In'}
+                {hasClockedOutToday
+                  ? 'Completed'
+                  : hasClockedInToday
+                  ? `${todayRecord?.status}`
+                  : 'Not Clocked In'}
               </span>
             </div>
 
@@ -89,7 +116,7 @@ export const Sidebar: React.FC = () => {
         )}
 
         {isAdmin && (
-          <div className="text-[11px] text-slate-600 pt-1 border-t border-slate-200">
+          <div className="text-[11px] text-slate-600 pt-1 border-t border-[#E5E7EB]">
             <span className="font-semibold text-slate-800">Admin Mode Active</span>
             <p className="text-[10px] text-slate-500 mt-0.5">DVT Supervisory Controls</p>
           </div>
@@ -101,7 +128,7 @@ export const Sidebar: React.FC = () => {
         {/* ================= LEARNER ONLY NAVIGATION ================= */}
         {isLearner && (
           <div>
-            <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-[#2F3E96]/70">
               Learner Menu
             </div>
             <div className="space-y-0.5">
@@ -110,7 +137,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('learner_dashboard')}
               >
                 <span className="flex items-center gap-2.5">
-                  <LayoutDashboard className="w-4 h-4" />
+                  <LayoutDashboard className="w-4 h-4 text-[#2F3E96]" />
                   <span>Dashboard</span>
                 </span>
               </button>
@@ -120,14 +147,18 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('learner_attendance')}
               >
                 <span className="flex items-center gap-2.5">
-                  <Clock className="w-4 h-4" />
+                  <Clock className="w-4 h-4 text-[#2F3E96]" />
                   <span>Attendance</span>
                 </span>
-                {hasClockedInToday && (
-                  <span className="text-[9px] uppercase bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-bold">
-                    Done
+                {hasClockedOutToday ? (
+                  <span className="text-[9px] uppercase bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                    Completed
                   </span>
-                )}
+                ) : hasClockedInToday ? (
+                  <span className="text-[9px] uppercase bg-blue-100 text-[#2F3E96] px-1.5 py-0.5 rounded font-bold">
+                    Clocked In
+                  </span>
+                ) : null}
               </button>
 
               <button
@@ -135,7 +166,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('learner_history')}
               >
                 <span className="flex items-center gap-2.5">
-                  <History className="w-4 h-4" />
+                  <History className="w-4 h-4 text-[#2F3E96]" />
                   <span>Attendance History</span>
                 </span>
               </button>
@@ -145,8 +176,18 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('learner_report_absence')}
               >
                 <span className="flex items-center gap-2.5">
-                  <CalendarX className="w-4 h-4" />
+                  <CalendarX className="w-4 h-4 text-[#2F3E96]" />
                   <span>Report Absence</span>
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveScreen('learner_directory')}
+                className={navItemClass('learner_directory')}
+              >
+                <span className="flex items-center gap-2.5">
+                  <Users className="w-4 h-4 text-[#2F3E96]" />
+                  <span>Learner Directory</span>
                 </span>
               </button>
 
@@ -155,7 +196,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('learner_profile')}
               >
                 <span className="flex items-center gap-2.5">
-                  <User className="w-4 h-4" />
+                  <User className="w-4 h-4 text-[#2F3E96]" />
                   <span>Profile</span>
                 </span>
               </button>
@@ -166,7 +207,7 @@ export const Sidebar: React.FC = () => {
         {/* ================= ADMIN ONLY NAVIGATION ================= */}
         {isAdmin && (
           <div>
-            <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <div className="px-3 mb-1 text-[10px] font-bold uppercase tracking-wider text-[#2F3E96]/70">
               Admin Governance
             </div>
             <div className="space-y-0.5">
@@ -175,7 +216,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_dashboard')}
               >
                 <span className="flex items-center gap-2.5">
-                  <LayoutDashboard className="w-4 h-4" />
+                  <LayoutDashboard className="w-4 h-4 text-[#2F3E96]" />
                   <span>Dashboard</span>
                 </span>
               </button>
@@ -185,7 +226,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_learners')}
               >
                 <span className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4" />
+                  <Users className="w-4 h-4 text-[#2F3E96]" />
                   <span>Learners</span>
                 </span>
               </button>
@@ -195,7 +236,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_attendance')}
               >
                 <span className="flex items-center gap-2.5">
-                  <CheckSquare className="w-4 h-4" />
+                  <CheckSquare className="w-4 h-4 text-[#2F3E96]" />
                   <span>Attendance</span>
                 </span>
               </button>
@@ -205,7 +246,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_absence_requests')}
               >
                 <span className="flex items-center gap-2.5">
-                  <CalendarX className="w-4 h-4" />
+                  <CalendarX className="w-4 h-4 text-[#2F3E96]" />
                   <span>Absence Requests</span>
                 </span>
               </button>
@@ -215,7 +256,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_register_downloads')}
               >
                 <span className="flex items-center gap-2.5">
-                  <FileSpreadsheet className="w-4 h-4" />
+                  <FileSpreadsheet className="w-4 h-4 text-[#2F3E96]" />
                   <span>Register Downloads</span>
                 </span>
               </button>
@@ -225,7 +266,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_system_controls')}
               >
                 <span className="flex items-center gap-2.5">
-                  <Sliders className="w-4 h-4" />
+                  <Sliders className="w-4 h-4 text-[#2F3E96]" />
                   <span>System Controls</span>
                 </span>
               </button>
@@ -235,7 +276,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_schedule_management')}
               >
                 <span className="flex items-center gap-2.5">
-                  <CalendarDays className="w-4 h-4" />
+                  <CalendarDays className="w-4 h-4 text-[#2F3E96]" />
                   <span>Work Schedule Management</span>
                 </span>
               </button>
@@ -245,7 +286,7 @@ export const Sidebar: React.FC = () => {
                 className={navItemClass('admin_settings')}
               >
                 <span className="flex items-center gap-2.5">
-                  <Settings className="w-4 h-4" />
+                  <Settings className="w-4 h-4 text-[#2F3E96]" />
                   <span>Settings</span>
                 </span>
               </button>
@@ -254,26 +295,26 @@ export const Sidebar: React.FC = () => {
         )}
 
         {/* System Architecture Specifications (Accessible for reviewer verification) */}
-        <div className="pt-2 border-t border-slate-100">
+        <div className="pt-2 border-t border-[#E5E7EB]">
           <button
             onClick={() => setActiveScreen('specs_documentation')}
             className={navItemClass('specs_documentation')}
           >
             <span className="flex items-center gap-2.5">
-              <Layers className="w-4 h-4 text-sky-600" />
+              <Layers className="w-4 h-4 text-[#2F3E96]" />
               <span>Full Specifications</span>
             </span>
-            <span className="text-[9px] bg-sky-100 text-sky-800 px-1.5 py-0.2 rounded font-bold">
+            <span className="text-[9px] bg-amber-100 text-[#2F3E96] border border-[#F4B52C]/40 px-1.5 py-0.2 rounded font-bold">
               20 Specs
             </span>
           </button>
         </div>
 
         {/* Sign Out Action */}
-        <div className="pt-2 border-t border-slate-100">
+        <div className="pt-2 border-t border-[#E5E7EB]">
           <button
             onClick={() => logout()}
-            className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded transition-colors text-left text-rose-700 hover:bg-rose-50"
+            className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold rounded-md transition-colors text-left text-rose-700 hover:bg-rose-50"
             title="Sign out and return to Login & Registration portal"
           >
             <span className="flex items-center gap-2.5">
@@ -286,9 +327,9 @@ export const Sidebar: React.FC = () => {
       </nav>
 
       {/* Footer */}
-      <div className="p-3 border-t border-slate-200 bg-slate-50 text-[10px] text-slate-500">
-        <div className="flex items-center gap-1.5 text-slate-800 font-bold mb-0.5">
-          <Building2 className="w-3.5 h-3.5 text-[#0F4C81]" />
+      <div className="p-3 border-t border-[#E5E7EB] bg-[#F5F5F5] text-[10px] text-slate-500">
+        <div className="flex items-center gap-1.5 text-[#333333] font-bold mb-0.5">
+          <Building2 className="w-3.5 h-3.5 text-[#2F3E96]" />
           <span>DynamicDNA Campus</span>
         </div>
         <p className="leading-tight text-slate-500">

@@ -62,7 +62,7 @@ export const AdminAttendanceScreen: React.FC = () => {
       </div>
 
       {/* 2. Filters & Search */}
-      <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="relative w-full sm:w-72">
           <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
           <input
@@ -70,7 +70,7 @@ export const AdminAttendanceScreen: React.FC = () => {
             placeholder="Search learner name, number, date..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] focus:outline-none"
+            className="w-full pl-9 pr-3 py-1.5 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] focus:outline-none"
           />
         </div>
 
@@ -80,12 +80,12 @@ export const AdminAttendanceScreen: React.FC = () => {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-2.5 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-[#0F4C81] text-slate-700 bg-white"
+            className="px-2.5 py-1 border border-[#E5E7EB] rounded text-xs focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96] text-slate-700 bg-white"
           />
           {selectedDate && (
             <button
               onClick={() => setSelectedDate('')}
-              className="text-xs text-rose-600 hover:underline font-medium"
+              className="text-xs text-rose-600 hover:underline font-medium cursor-pointer"
             >
               Clear Date
             </button>
@@ -95,7 +95,7 @@ export const AdminAttendanceScreen: React.FC = () => {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="bg-white border border-slate-300 rounded px-2.5 py-1 text-xs text-slate-700 focus:ring-1 focus:ring-[#0F4C81]"
+            className="bg-white border border-[#E5E7EB] rounded px-2.5 py-1 text-xs text-slate-700 focus:ring-1 focus:ring-[#2F3E96] focus:border-[#2F3E96]"
           >
             <option value="all">All Statuses</option>
             <option value="Present">Present (On-Time)</option>
@@ -106,36 +106,37 @@ export const AdminAttendanceScreen: React.FC = () => {
       </div>
 
       {/* 3. Table */}
-      <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 uppercase text-[10px] font-semibold tracking-wider">
+            <thead className="bg-[#2F3E96] text-white uppercase text-[10px] font-bold tracking-wider">
               <tr>
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Learner Number</th>
-                <th className="py-3 px-4">Learner Name</th>
-                <th className="py-3 px-4">Clock-In</th>
-                <th className="py-3 px-4">Clock-Out</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Access ID</th>
-                <th className="py-3 px-4">Notes</th>
+                <th className="py-3 px-4 text-white">Date</th>
+                <th className="py-3 px-4 text-white">Learner Number</th>
+                <th className="py-3 px-4 text-white">Learner Name</th>
+                <th className="py-3 px-4 text-white">Clock-In</th>
+                <th className="py-3 px-4 text-white">Clock-Out</th>
+                <th className="py-3 px-4 text-white">GPS Verification</th>
+                <th className="py-3 px-4 text-white">Status</th>
+                <th className="py-3 px-4 text-white">Access ID</th>
+                <th className="py-3 px-4 text-white">Notes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 text-slate-800">
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-400">
+                  <td colSpan={9} className="py-8 text-center text-slate-400">
                     No attendance records found matching current query.
                   </td>
                 </tr>
               ) : (
                 filteredRecords.map((rec) => (
-                  <tr key={rec.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={rec.id} className="hover:bg-[#F4B52C]/10 transition-colors">
                     <td className="py-3 px-4 font-mono font-medium text-slate-900 whitespace-nowrap">
                       {rec.date}
                     </td>
 
-                    <td className="py-3 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
+                    <td className="py-3 px-4 font-mono font-bold text-[#2F3E96] whitespace-nowrap">
                       {rec.learnerNumber}
                     </td>
 
@@ -159,19 +160,33 @@ export const AdminAttendanceScreen: React.FC = () => {
                       )}
                     </td>
 
+                    <td className="py-3 px-4 font-mono text-[11px] whitespace-nowrap">
+                      {rec.verifiedDistanceMeters !== undefined ? (
+                        <span className="inline-flex items-center gap-1 text-emerald-800 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          {rec.verifiedDistanceMeters}m (Office)
+                        </span>
+                      ) : rec.dayType === 'wfh' ? (
+                        <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+                          WFH Exempt
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span
-                        className={`inline-flex items-center gap-1 font-semibold text-[11px] uppercase ${
+                        className={`inline-flex items-center gap-1 font-semibold text-[11px] uppercase px-2 py-0.5 rounded border ${
                           rec.status === 'Present'
-                            ? 'text-emerald-700'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                             : rec.status === 'Late'
-                            ? 'text-amber-700'
-                            : 'text-rose-700'
+                            ? 'bg-amber-50 text-amber-900 border-[#F4B52C]/60 font-bold'
+                            : 'bg-rose-50 text-rose-800 border-rose-200'
                         }`}
                       >
-                        {rec.status === 'Present' && <CheckCircle2 className="w-3.5 h-3.5" />}
-                        {rec.status === 'Late' && <Clock className="w-3.5 h-3.5" />}
-                        {rec.status === 'Absent' && <AlertTriangle className="w-3.5 h-3.5" />}
+                        {rec.status === 'Present' && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />}
+                        {rec.status === 'Late' && <Clock className="w-3.5 h-3.5 text-[#F4B52C]" />}
+                        {rec.status === 'Absent' && <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />}
                         <span>{rec.status}</span>
                       </span>
                     </td>

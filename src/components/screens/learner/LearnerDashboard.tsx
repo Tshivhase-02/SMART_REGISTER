@@ -12,6 +12,10 @@ import {
   ArrowRight,
   KeyRound,
   ShieldAlert,
+  Users,
+  User,
+  Navigation,
+  RefreshCw,
 } from 'lucide-react';
 import { evaluateClockInStatus, isClockOutAllowed } from '../../../utils/geoUtils';
 
@@ -21,6 +25,11 @@ export const LearnerDashboard: React.FC = () => {
     setActiveScreen,
     currentTime,
     todayScheduleType,
+    workplaceConfig,
+    currentCoordinates,
+    gpsAccuracyMeters,
+    captureAndVerifyLocation,
+    isCapturingLocation,
     distanceFromOffice,
     isLocationVerified,
     dailyAccessId,
@@ -69,7 +78,7 @@ export const LearnerDashboard: React.FC = () => {
       {/* 2. Non-working day message (Weekend / Public Holiday) */}
       {!workingDayStatus.isWorkingDay && (
         <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 flex items-start gap-3">
-          <Clock className="w-5 h-5 text-[#0F4C81] shrink-0 mt-0.5" />
+          <Clock className="w-5 h-5 text-[#2F3E96] shrink-0 mt-0.5" />
           <div>
             <h4 className="font-bold text-sm">
               {workingDayStatus.isWeekend ? 'Weekend Notice' : workingDayStatus.holidayName}
@@ -80,7 +89,7 @@ export const LearnerDashboard: React.FC = () => {
       )}
 
       {/* 3. Welcome Banner */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
             <span>DynamicDNA · DVT Learnership Programme</span>
@@ -96,14 +105,14 @@ export const LearnerDashboard: React.FC = () => {
         </div>
 
         {/* Daily Access ID pill */}
-        <div className="bg-slate-50 border border-slate-200 p-3 rounded-md text-xs text-left sm:text-right shrink-0">
+        <div className="bg-slate-50 border border-[#E5E7EB] p-3 rounded-md text-xs text-left sm:text-right shrink-0">
           <span className="text-[10px] uppercase font-bold text-slate-500 block">
             Today's Daily Access ID:
           </span>
           <span
             className={`font-mono font-bold text-sm block ${
               isDailyAccessVerified && dailyAccessId
-                ? 'text-[#0F4C81]'
+                ? 'text-[#2F3E96]'
                 : 'text-rose-600'
             }`}
           >
@@ -122,13 +131,13 @@ export const LearnerDashboard: React.FC = () => {
       {/* 4. Today's Status Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Today's Schedule Card */}
-        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs">
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 shadow-xs">
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block mb-1">
             Today's Schedule
           </span>
           <div className="flex items-center gap-2">
             {todayScheduleType === 'office' ? (
-              <Building className="w-5 h-5 text-[#0F4C81]" />
+              <Building className="w-5 h-5 text-[#2F3E96]" />
             ) : (
               <Home className="w-5 h-5 text-emerald-600" />
             )}
@@ -144,40 +153,64 @@ export const LearnerDashboard: React.FC = () => {
         </div>
 
         {/* Location Status Card */}
-        <div className="bg-white border border-slate-200 rounded-lg p-4 shadow-xs space-y-1.5">
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">
-            Location Status
-          </span>
+        <div className="bg-white border border-[#E5E7EB] rounded-lg p-4 shadow-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide block">
+              Location Status
+            </span>
+            <button
+              onClick={() => captureAndVerifyLocation()}
+              disabled={isCapturingLocation}
+              className="text-[10px] text-[#2F3E96] font-semibold hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              title="Query device GPS"
+            >
+              <RefreshCw className={`w-3 h-3 ${isCapturingLocation ? 'animate-spin' : ''}`} />
+              <span>{isCapturingLocation ? 'Verifying...' : 'Verify'}</span>
+            </button>
+          </div>
+
           <div>
             {todayScheduleType === 'office' ? (
               isLocationVerified ? (
-                <span className="text-base font-bold text-emerald-700 block">
-                  Verified ✅
-                </span>
+                <div className="flex items-center gap-1.5 text-emerald-700">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-bold">Verified (Office)</span>
+                </div>
               ) : (
-                <span className="text-base font-bold text-rose-700 block">
-                  Not Verified ❌
-                </span>
+                <div className="flex items-center gap-1.5 text-rose-700">
+                  <AlertTriangle className="w-4 h-4 text-rose-600" />
+                  <span className="text-sm font-bold">Not Verified</span>
+                </div>
               )
             ) : (
-              <span className="text-base font-bold text-emerald-700 block">
-                Verified ✅ (WFH)
-              </span>
+              <div className="flex items-center gap-1.5 text-emerald-700">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-bold">Verified (WFH Exempt)</span>
+              </div>
             )}
           </div>
-          <div className="text-xs text-slate-600 pt-1 space-y-0.5 border-t border-slate-100">
-            <p className="text-[11px] text-slate-500">
-              Current Location:{' '}
-              <span className="font-semibold text-slate-700">
-                {isLocationVerified ? 'Randburg, Gauteng' : 'Johannesburg'}
-              </span>
+
+          <div className="text-xs text-slate-600 pt-1 space-y-0.5 border-t border-slate-100 font-mono text-[11px]">
+            <p className="text-slate-500">
+              GPS:{' '}
+              <span className="font-semibold text-slate-800">
+                {currentCoordinates?.latitude.toFixed(4)}, {currentCoordinates?.longitude.toFixed(4)}
+              </span>{' '}
+              <span className="text-[10px] text-slate-400">({gpsAccuracyMeters}m)</span>
             </p>
-            <p className="text-[11px] text-slate-500">
-              Distance From DynamicDNA:{' '}
-              <span className="font-semibold text-slate-700">
+            <p className="text-slate-500">
+              Distance:{' '}
+              <span
+                className={`font-semibold ${
+                  distanceFromOffice <= workplaceConfig.allowedRadiusMeters
+                    ? 'text-emerald-700'
+                    : 'text-rose-700'
+                }`}
+              >
                 {distanceFromOffice > 1000
                   ? `${(distanceFromOffice / 1000).toFixed(1)} km`
-                  : `${distanceFromOffice} metres`}
+                  : `${distanceFromOffice}m`}{' '}
+                / {workplaceConfig.allowedRadiusMeters}m
               </span>
             </p>
           </div>
@@ -296,11 +329,11 @@ export const LearnerDashboard: React.FC = () => {
             </span>
           </div>
 
-          <div className="bg-slate-50 p-3 rounded border border-slate-200">
+          <div className="bg-slate-50 p-3 rounded border border-[#E5E7EB]">
             <span className="text-[10px] font-semibold text-slate-500 uppercase block mb-1">
               Attendance Percentage
             </span>
-            <span className="text-2xl font-bold font-mono text-[#0F4C81]">
+            <span className="text-2xl font-bold font-mono text-[#2F3E96]">
               {attendanceRate}%
             </span>
           </div>
@@ -308,45 +341,63 @@ export const LearnerDashboard: React.FC = () => {
       </div>
 
       {/* 7. Quick Actions */}
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
+      <div className="bg-white border border-[#E5E7EB] rounded-lg p-5 shadow-xs">
         <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">
           Quick Actions
         </h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <button
             onClick={() => setActiveScreen('learner_attendance')}
-            className="flex flex-col items-center justify-center p-3 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-slate-800 text-center"
+            className="flex flex-col items-center justify-center p-3 rounded border border-[#E5E7EB] bg-slate-50 hover:bg-[#F4B52C]/10 hover:border-[#F4B52C] transition-colors text-slate-800 text-center cursor-pointer"
           >
-            <Clock className="w-5 h-5 text-[#0F4C81] mb-1" />
+            <Clock className="w-5 h-5 text-[#2F3E96] mb-1" />
             <span className="text-xs font-semibold">Clock-In</span>
             <span className="text-[10px] text-slate-500">Morning Terminal</span>
           </button>
 
           <button
             onClick={() => setActiveScreen('learner_attendance')}
-            className="flex flex-col items-center justify-center p-3 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-slate-800 text-center"
+            className="flex flex-col items-center justify-center p-3 rounded border border-[#E5E7EB] bg-slate-50 hover:bg-[#F4B52C]/10 hover:border-[#F4B52C] transition-colors text-slate-800 text-center cursor-pointer"
           >
-            <Clock className="w-5 h-5 text-slate-700 mb-1" />
+            <Clock className="w-5 h-5 text-[#2F3E96] mb-1" />
             <span className="text-xs font-semibold">Clock-Out</span>
             <span className="text-[10px] text-slate-500">From 15:15</span>
           </button>
 
           <button
             onClick={() => setActiveScreen('learner_history')}
-            className="flex flex-col items-center justify-center p-3 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-slate-800 text-center"
+            className="flex flex-col items-center justify-center p-3 rounded border border-[#E5E7EB] bg-slate-50 hover:bg-[#2F3E96]/10 hover:border-[#2F3E96] transition-colors text-slate-800 text-center cursor-pointer"
           >
-            <History className="w-5 h-5 text-slate-700 mb-1" />
-            <span className="text-xs font-semibold">Attendance History</span>
-            <span className="text-[10px] text-slate-500">View Timesheets</span>
+            <History className="w-5 h-5 text-[#2F3E96] mb-1" />
+            <span className="text-xs font-semibold">History</span>
+            <span className="text-[10px] text-slate-500">Timesheets</span>
           </button>
 
           <button
             onClick={() => setActiveScreen('learner_report_absence')}
-            className="flex flex-col items-center justify-center p-3 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-slate-800 text-center"
+            className="flex flex-col items-center justify-center p-3 rounded border border-slate-200 bg-slate-50 hover:bg-slate-100 transition-colors text-slate-800 text-center cursor-pointer"
           >
             <CalendarX className="w-5 h-5 text-rose-600 mb-1" />
-            <span className="text-xs font-semibold">Report Absence</span>
+            <span className="text-xs font-semibold">Absence</span>
             <span className="text-[10px] text-slate-500">Submit Leave</span>
+          </button>
+
+          <button
+            onClick={() => setActiveScreen('learner_directory')}
+            className="flex flex-col items-center justify-center p-3 rounded border border-[#E5E7EB] bg-slate-50 hover:bg-[#2F3E96]/10 hover:border-[#2F3E96] transition-colors text-slate-800 text-center cursor-pointer"
+          >
+            <Users className="w-5 h-5 text-[#2F3E96] mb-1" />
+            <span className="text-xs font-semibold">Directory</span>
+            <span className="text-[10px] text-slate-500">Find Peers</span>
+          </button>
+
+          <button
+            onClick={() => setActiveScreen('learner_profile')}
+            className="flex flex-col items-center justify-center p-3 rounded border border-[#E5E7EB] bg-slate-50 hover:bg-[#2F3E96]/10 hover:border-[#2F3E96] transition-colors text-slate-800 text-center cursor-pointer"
+          >
+            <User className="w-5 h-5 text-[#2F3E96] mb-1" />
+            <span className="text-xs font-semibold">My Profile</span>
+            <span className="text-[10px] text-slate-500">Card & Skills</span>
           </button>
         </div>
       </div>
