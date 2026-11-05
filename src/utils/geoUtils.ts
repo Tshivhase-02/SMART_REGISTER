@@ -144,10 +144,15 @@ export function isWithinGeofence(
 /**
  * Verifies user coordinates against authorized workplace parameters.
  */
+/**
+ * Verifies user coordinates against authorized workplace parameters.
+ * Supports detected place name from reverse geocoding while keeping authoritative GPS metrics.
+ */
 export function verifyLocationAgainstWorkplace(
   coords: Coordinates,
   workplace: WorkplaceOffice = DEFAULT_WORKPLACE_OFFICE,
-  timestamp?: string
+  timestamp?: string,
+  detectedPlace?: string | null
 ): LocationVerificationResult {
   const capturedAt = timestamp || new Date().toISOString();
 
@@ -158,6 +163,8 @@ export function verifyLocationAgainstWorkplace(
       capturedAt,
       isWithinGeofence: false,
       isAccuracyAcceptable: false,
+      displayStatus: 'Workplace Inactive',
+      displayMessage: 'Workplace attendance is temporarily inactive in system controls.',
       message: 'Workplace attendance is temporarily inactive in system controls.',
       errorCode: 'INACTIVE_WORKPLACE',
     };
@@ -179,13 +186,25 @@ export function verifyLocationAgainstWorkplace(
       accuracyThresholdMeters: workplace.gpsAccuracyThresholdMeters,
       isWithinGeofence,
       isAccuracyAcceptable: false,
-      message: `GPS accuracy is ${accuracy}m (Threshold: ${workplace.gpsAccuracyThresholdMeters}m). Accuracy insufficient. Move closer to a window or outdoors to improve satellite lock.`,
+      displayStatus: 'GPS accuracy insufficient.',
+      displayMessage: 'GPS accuracy insufficient – Please wait for a more accurate reading.',
+      message: `GPS accuracy is ${accuracy}m (Threshold: ${workplace.gpsAccuracyThresholdMeters}m). GPS accuracy insufficient – Please wait for a more accurate reading.`,
       errorCode: 'ACCURACY_POOR',
     };
   }
 
   if (!isWithinGeofence) {
-    const diff = distance - workplace.allowedRadiusMeters;
+    const rawPlace = detectedPlace?.trim();
+    const hasKnownPlace = Boolean(
+      rawPlace &&
+        rawPlace !== 'Unable to identify your current location.' &&
+        rawPlace !== 'Unable to identify your current location'
+    );
+    const resolvedPlace = hasKnownPlace ? rawPlace! : 'Unable to identify your current location.';
+    const displayMsg = hasKnownPlace
+      ? `You are currently at ${resolvedPlace}, which is outside the authorised workplace area.`
+      : 'You are currently outside the authorised workplace area.';
+
     return {
       status: 'error',
       coordinates: coords,
@@ -196,11 +215,15 @@ export function verifyLocationAgainstWorkplace(
       accuracyThresholdMeters: workplace.gpsAccuracyThresholdMeters,
       isWithinGeofence: false,
       isAccuracyAcceptable: true,
-      message: `Outside authorised workplace area. Distance: ${distance}m (Allowed: ${workplace.allowedRadiusMeters}m, exceeded by ${diff}m). Physical presence at ${workplace.name} required.`,
+      detectedPlace: resolvedPlace,
+      displayStatus: 'Outside Authorised Area.',
+      displayMessage: displayMsg,
+      message: displayMsg,
       errorCode: 'OUTSIDE_RADIUS',
     };
   }
 
+  const campusPlace = 'DynamicDNA Campus.';
   return {
     status: 'success',
     coordinates: coords,
@@ -211,7 +234,10 @@ export function verifyLocationAgainstWorkplace(
     accuracyThresholdMeters: workplace.gpsAccuracyThresholdMeters,
     isWithinGeofence: true,
     isAccuracyAcceptable: true,
-    message: `Authorised radius: ${workplace.allowedRadiusMeters} metres. Learner distance: ${distance} metres. Result: LOCATION VERIFIED.`,
+    detectedPlace: campusPlace,
+    displayStatus: 'Location Verified.',
+    displayMessage: 'You are within the authorised workplace area.',
+    message: 'You are within the authorised workplace area.',
   };
 }
 

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   X,
   Check,
+  MapPin,
 } from 'lucide-react';
 import { evaluateClockInStatus, isClockOutAllowed } from '../../../utils/geoUtils';
 
@@ -38,13 +39,6 @@ export const LearnerAttendanceScreen: React.FC = () => {
   const [clockOutMessage, setClockOutMessage] = useState<string | null>(null);
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [notesInput, setNotesInput] = useState('');
-
-  // Automatically request GPS verification when opening attendance screen on an Office day if not yet performed
-  useEffect(() => {
-    if (todayScheduleType === 'office' && !locationVerificationResult) {
-      captureAndVerifyLocation();
-    }
-  }, [todayScheduleType, locationVerificationResult, captureAndVerifyLocation]);
 
   const clockInEval = evaluateClockInStatus(currentTime);
   const clockOutEval = isClockOutAllowed(currentTime);
@@ -93,47 +87,81 @@ export const LearnerAttendanceScreen: React.FC = () => {
     setShowClockOutModal(false);
   };
 
-  // Location Result Display (Strictly simplified: no coordinates, no Haversine, no meters)
+  // Location Result Display (Display detected place name without raw coordinates)
   const getLocationDisplay = () => {
     if (!isOfficeDay) {
       return {
         status: 'verified',
-        title: 'Location verified (Work From Home).',
-        description: 'Work From Home attendance is authorized.',
+        title: 'Remote Attendance Authorised.',
+        detectedPlace: null,
+        message: 'Location verification is not required for Work From Home.',
+      };
+    }
+
+    if (!locationVerificationResult) {
+      return {
+        status: 'unverified',
+        title: 'Location verification required.',
+        detectedPlace: null,
+        message: 'Please press Verify Location to verify your presence at DynamicDNA Campus.',
+      };
+    }
+
+    if (locationVerificationResult?.errorCode === 'PERMISSION_DENIED') {
+      return {
+        status: 'permission_denied',
+        title: 'Location permission denied.',
+        detectedPlace: null,
+        message: 'Location permission denied – Allow location access in your browser.',
+      };
+    }
+
+    if (
+      locationVerificationResult?.errorCode === 'POSITION_UNAVAILABLE' ||
+      locationVerificationResult?.errorCode === 'TIMEOUT' ||
+      locationVerificationResult?.errorCode === 'NOT_SUPPORTED'
+    ) {
+      return {
+        status: 'unable',
+        title: 'Unable to detect location.',
+        detectedPlace: null,
+        message: 'Unable to detect location – Please try again.',
+      };
+    }
+
+    if (locationVerificationResult?.errorCode === 'ACCURACY_POOR') {
+      return {
+        status: 'accuracy_poor',
+        title: 'GPS accuracy insufficient.',
+        detectedPlace: null,
+        message: 'GPS accuracy insufficient – Please wait for a more accurate reading.',
       };
     }
 
     if (isLocationVerified) {
       return {
         status: 'verified',
-        title: 'Location verified.',
-        description: 'You are at DynamicDNA campus.',
+        title: 'Location Verified.',
+        detectedPlace: 'DynamicDNA Campus.',
+        message: 'You are within the authorised workplace area.',
       };
     }
 
-    if (locationVerificationResult?.errorCode === 'PERMISSION_DENIED') {
-      return {
-        status: 'permission_required',
-        title: 'Location permission required.',
-        description: 'Please enable location access in your browser to verify attendance.',
-      };
-    }
-
-    if (
-      locationVerificationResult?.errorCode === 'POSITION_UNAVAILABLE' ||
-      locationVerificationResult?.errorCode === 'TIMEOUT'
-    ) {
-      return {
-        status: 'unable',
-        title: 'Unable to determine location.',
-        description: 'Please ensure GPS or location services are active on your device.',
-      };
-    }
+    const rawPlace = locationVerificationResult?.detectedPlace?.trim();
+    const hasKnownPlace = Boolean(
+      rawPlace &&
+        rawPlace !== 'Unable to identify your current location.' &&
+        rawPlace !== 'Unable to identify your current location'
+    );
+    const detectedPlace = hasKnownPlace ? rawPlace! : 'Unable to identify your current location.';
 
     return {
-      status: 'failed',
-      title: 'Location verification failed.',
-      description: 'You must be present at DynamicDNA to register office attendance.',
+      status: 'outside',
+      title: 'Outside Authorised Area.',
+      detectedPlace: detectedPlace,
+      message: hasKnownPlace
+        ? `You are currently at ${detectedPlace}, which is outside the authorised workplace area.`
+        : 'You are currently outside the authorised workplace area.',
     };
   };
 
@@ -226,19 +254,44 @@ export const LearnerAttendanceScreen: React.FC = () => {
           className={`p-4 rounded-lg border flex items-start gap-3 ${
             locationDisplay.status === 'verified'
               ? 'bg-emerald-50 border-emerald-200 text-emerald-950'
-              : locationDisplay.status === 'permission_required'
+              : locationDisplay.status === 'unverified'
+              ? 'bg-blue-50 border-blue-200 text-blue-950'
+              : locationDisplay.status === 'permission_denied' || locationDisplay.status === 'accuracy_poor'
               ? 'bg-amber-50 border-amber-200 text-amber-950'
               : 'bg-rose-50 border-rose-200 text-rose-950'
           }`}
         >
           {locationDisplay.status === 'verified' ? (
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          ) : locationDisplay.status === 'unverified' ? (
+            <MapPin className="w-5 h-5 text-[#2F3E96] shrink-0 mt-0.5" />
           ) : (
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
           )}
-          <div className="space-y-0.5">
-            <h4 className="font-bold text-sm">{locationDisplay.title}</h4>
-            <p className="text-xs opacity-90">{locationDisplay.description}</p>
+          <div className="space-y-1">
+            <h4
+              className={`font-bold text-sm ${
+                locationDisplay.status === 'verified'
+                  ? 'text-emerald-900'
+                  : locationDisplay.status === 'unverified'
+                  ? 'text-[#2F3E96]'
+                  : 'text-slate-900'
+              }`}
+            >
+              {locationDisplay.title}
+            </h4>
+            {locationDisplay.detectedPlace && (
+              <div className="text-slate-800 font-medium text-xs flex items-baseline gap-1">
+                <span className="font-semibold text-slate-500">Detected place:</span>
+                <span className="font-bold">{locationDisplay.detectedPlace}</span>
+              </div>
+            )}
+            <p className="text-xs opacity-90 leading-relaxed">{locationDisplay.message}</p>
+            {isOfficeDay && (
+              <div className="text-[10px] text-slate-400 pt-0.5">
+                Map data © OpenStreetMap contributors
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -266,7 +319,13 @@ export const LearnerAttendanceScreen: React.FC = () => {
                   Time: <strong>{todayRecord?.clockInTime} SAST</strong>
                 </p>
                 <p className="text-slate-600">
-                  Status: <strong>{todayRecord?.status}</strong>
+                  Status: <strong>
+                    {todayRecord?.status === 'Present'
+                      ? 'Present – On Time'
+                      : todayRecord?.status === 'Late'
+                      ? 'Present – Late'
+                      : todayRecord?.status}
+                  </strong>
                 </p>
               </div>
             ) : (

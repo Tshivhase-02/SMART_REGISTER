@@ -84,6 +84,10 @@ export interface LocationVerificationResult {
   isWithinGeofence: boolean;
   isAccuracyAcceptable: boolean;
   message: string;
+  detectedPlace?: string; // Human-readable detected place name or nearest available address
+  displayStatus?: string; // E.g. "Location Verified." or "Outside Authorised Area."
+  displayMessage?: string; // E.g. "You are within the authorised workplace area."
+  reverseGeocodeStatus?: 'success' | 'failed' | 'loading' | 'skipped';
   errorCode?:
     | 'PERMISSION_DENIED'
     | 'POSITION_UNAVAILABLE'

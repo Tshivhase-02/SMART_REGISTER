@@ -37,6 +37,7 @@ import {
 } from '../data/mockData';
 import { toProperCase, generateWorkEmail } from '../utils/nameUtils';
 import { attendanceVerificationService } from '../services/attendanceVerificationService';
+import { reverseGeocodingService } from '../services/reverseGeocodingService';
 
 export type LearnerScreenId =
   | 'learner_dashboard'
@@ -215,7 +216,22 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [systemControls, setSystemControls] = useState<SystemControlsConfig>(DEFAULT_SYSTEM_CONTROLS);
 
   // Attendance & Absence Records
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(INITIAL_ATTENDANCE_RECORDS);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('smartregister_attendance_records');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(
+            (r: AttendanceRecord) => !(r.id === 'rec_16' || r.id === 'rec_17')
+          );
+        }
+      }
+    } catch (e) {
+      console.warn('Failed reading attendance records from localStorage', e);
+    }
+    return INITIAL_ATTENDANCE_RECORDS;
+  });
   const [absenceRequests, setAbsenceRequests] = useState<AbsenceRequest[]>(INITIAL_ABSENCE_REQUESTS);
 
   // Time & Simulation
@@ -273,10 +289,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     ];
   });
 
-  // Location Verification Result (Initialized for default coordinates)
-  const [locationVerificationResult, setLocationVerificationResult] = useState<LocationVerificationResult | null>(() => {
-    return verifyLocationAgainstWorkplace(defaultPreset.coordinates, DEFAULT_WORKPLACE_OFFICE);
-  });
+  // Location Verification Result (Defaults to null - learner must explicitly press "Verify Location")
+  const [locationVerificationResult, setLocationVerificationResult] = useState<LocationVerificationResult | null>(null);
 
   // Daily Access IDs store per user per date: { [userId_dateStr]: string }
   const [issuedAccessIds, setIssuedAccessIds] = useState<Record<string, string>>({
@@ -312,7 +326,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const distanceFromOffice = geofenceResult.distance;
   const isAccuracyAcceptable = gpsAccuracyMeters <= workplaceConfig.gpsAccuracyThresholdMeters;
-  const isLocationVerified = geofenceResult.isWithin && isAccuracyAcceptable && workplaceConfig.isActive;
+  const isLocationVerified =
+    locationVerificationResult !== null &&
+    locationVerificationResult.status === 'success' &&
+    geofenceResult.isWithin &&
+    isAccuracyAcceptable &&
+    workplaceConfig.isActive;
 
   // Working day evaluation
   const workingDayStatus = evaluateWorkingDay(activeTime);
@@ -810,7 +829,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // GPS Controls & Verification
-  const setCoordinatesPreset = (presetId: string) => {
+  const setCoordinatesPreset = async (presetId: string) => {
     const preset = TEST_LOCATION_PRESETS.find((p) => p.id === presetId);
     if (preset) {
       setSelectedPresetId(presetId);
@@ -819,7 +838,24 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setGpsAccuracyMeters(acc);
       const timestamp = activeTime.toISOString();
       setLastLocationCapturedAt(timestamp);
-      const verification = verifyLocationAgainstWorkplace(preset.coordinates, workplaceConfig, timestamp);
+
+      const distance = calculateDistanceMeters(preset.coordinates, workplaceConfig.coordinates);
+      const isWithin = distance <= workplaceConfig.allowedRadiusMeters;
+      const isAccOk = acc <= workplaceConfig.gpsAccuracyThresholdMeters;
+
+      let detectedPlace: string | null = null;
+      if (isWithin && isAccOk) {
+        detectedPlace = 'DynamicDNA Campus.';
+      } else {
+        detectedPlace = await reverseGeocodingService.lookupPlaceName(preset.coordinates);
+      }
+
+      const verification = verifyLocationAgainstWorkplace(
+        preset.coordinates,
+        workplaceConfig,
+        timestamp,
+        detectedPlace
+      );
       setLocationVerificationResult(verification);
     }
   };
@@ -830,10 +866,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setLastLocationCapturedAt(timestamp);
 
     if (!navigator.geolocation) {
-      const fallback = verifyLocationAgainstWorkplace(currentCoordinates, workplaceConfig, timestamp);
       const notSupportedResult: LocationVerificationResult = {
-        ...fallback,
         status: 'error',
+        capturedAt: timestamp,
+        isWithinGeofence: false,
+        isAccuracyAcceptable: false,
+        displayStatus: 'Unable to detect location.',
+        displayMessage: 'Geolocation API is not supported by your browser environment.',
         message: 'Geolocation API is not supported by your browser environment.',
         errorCode: 'NOT_SUPPORTED',
       };
@@ -844,51 +883,105 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     return new Promise((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (pos) => {
+        async (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const rawAcc = pos.coords.accuracy;
+
+          if (
+            typeof lat !== 'number' ||
+            typeof lng !== 'number' ||
+            isNaN(lat) ||
+            isNaN(lng)
+          ) {
+            const invalidResult: LocationVerificationResult = {
+              status: 'error',
+              capturedAt: timestamp,
+              isWithinGeofence: false,
+              isAccuracyAcceptable: false,
+              displayStatus: 'Unable to detect location.',
+              displayMessage: 'Unable to detect location – Please try again.',
+              message: 'Unable to detect location – Please try again.',
+              errorCode: 'POSITION_UNAVAILABLE',
+            };
+            setLocationVerificationResult(invalidResult);
+            setIsCapturingLocation(false);
+            resolve(invalidResult);
+            return;
+          }
+
           const coords: Coordinates = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: pos.coords.accuracy,
+            latitude: lat,
+            longitude: lng,
+            accuracy: rawAcc,
           };
-          const acc = Math.round(pos.coords.accuracy);
+          const acc = Math.round(rawAcc ?? 10);
           setSelectedPresetId('browser_gps');
           setCurrentCoordinates(coords);
           setGpsAccuracyMeters(acc);
 
-          const verification = verifyLocationAgainstWorkplace(coords, workplaceConfig, timestamp);
+          // Authoritative Distance & Accuracy evaluation
+          const distance = calculateDistanceMeters(coords, workplaceConfig.coordinates);
+          const isWithin = distance <= workplaceConfig.allowedRadiusMeters;
+          const isAccOk = acc <= workplaceConfig.gpsAccuracyThresholdMeters;
+
+          let detectedPlace: string | null = null;
+          if (isWithin && isAccOk) {
+            // Within authorised campus area: detected place is DynamicDNA Campus
+            detectedPlace = 'DynamicDNA Campus.';
+          } else {
+            // Outside authorised area or poor accuracy: Reverse geocode to find real place name or nearest address
+            try {
+              detectedPlace = await reverseGeocodingService.lookupPlaceName(coords);
+            } catch {
+              detectedPlace = null;
+            }
+          }
+
+          const verification = verifyLocationAgainstWorkplace(
+            coords,
+            workplaceConfig,
+            timestamp,
+            detectedPlace
+          );
           setLocationVerificationResult(verification);
           setIsCapturingLocation(false);
           resolve(verification);
         },
         (error) => {
-          let errMessage = 'Unable to acquire location signal.';
+          // Do NOT display an old location as current location
+          let displayStatus = 'Unable to detect location.';
+          let displayMsg = 'Unable to detect location – Please try again.';
           let errCode: LocationVerificationResult['errorCode'] = 'POSITION_UNAVAILABLE';
 
           if (error.code === error.PERMISSION_DENIED) {
-            errMessage =
-              'Location permission denied. Please allow location permissions in your browser to verify physical presence.';
+            displayStatus = 'Location permission denied.';
+            displayMsg = 'Location permission denied – Allow location access in your browser.';
             errCode = 'PERMISSION_DENIED';
           } else if (error.code === error.TIMEOUT) {
-            errMessage =
-              'Location acquisition timed out. Please check your signal and click Retry Location.';
+            displayStatus = 'Unable to detect location.';
+            displayMsg = 'Unable to detect location – Please try again.';
             errCode = 'TIMEOUT';
           }
 
-          const fallback = verifyLocationAgainstWorkplace(currentCoordinates, workplaceConfig, timestamp);
           const errResult: LocationVerificationResult = {
-            ...fallback,
             status: 'error',
-            message: errMessage,
+            capturedAt: timestamp,
+            isWithinGeofence: false,
+            isAccuracyAcceptable: false,
+            displayStatus,
+            displayMessage: displayMsg,
+            message: displayMsg,
             errorCode: errCode,
           };
           setLocationVerificationResult(errResult);
           setIsCapturingLocation(false);
           resolve(errResult);
         },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
     });
-  }, [activeTime, currentCoordinates, workplaceConfig]);
+  }, [activeTime, workplaceConfig]);
 
   const useBrowserGeolocation = async (): Promise<boolean> => {
     const res = await captureAndVerifyLocation();

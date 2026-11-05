@@ -81,50 +81,84 @@ export const LearnerDashboard: React.FC = () => {
   };
 
   // Location display logic according to specifications:
-  // - Location verified.
-  // - Location verification failed.
-  // - Location permission required.
-  // - Unable to determine location.
+  // - Within authorised area: Status: Location Verified. Detected place: DynamicDNA Campus. Message: You are within the authorised workplace area.
+  // - Outside authorised area: Status: Outside Authorised Area. Detected place: [place]. Message: You are currently at [place], which is outside the authorised workplace area.
+  // - If reverse geocoding cannot identify: Detected place: Unable to identify your current location.
+  // - GPS errors: appropriate browser location error
   const getLocationDisplay = () => {
     if (!isOfficeDay) {
       return {
         status: 'verified',
         title: 'Remote attendance authorized.',
-        description: 'Location verification is not required for Work From Home.',
+        detectedPlace: null,
+        message: 'Location verification is not required for Work From Home.',
+      };
+    }
+
+    if (!locationVerificationResult) {
+      return {
+        status: 'unverified',
+        title: 'Location verification required.',
+        detectedPlace: null,
+        message: 'Please press Verify Location to verify your presence at DynamicDNA Campus.',
+      };
+    }
+
+    if (locationVerificationResult?.errorCode === 'PERMISSION_DENIED') {
+      return {
+        status: 'permission_denied',
+        title: 'Location permission denied.',
+        detectedPlace: null,
+        message: 'Location permission denied – Allow location access in your browser.',
+      };
+    }
+
+    if (
+      locationVerificationResult?.errorCode === 'POSITION_UNAVAILABLE' ||
+      locationVerificationResult?.errorCode === 'TIMEOUT' ||
+      locationVerificationResult?.errorCode === 'NOT_SUPPORTED'
+    ) {
+      return {
+        status: 'unable',
+        title: 'Unable to detect location.',
+        detectedPlace: null,
+        message: 'Unable to detect location – Please try again.',
+      };
+    }
+
+    if (locationVerificationResult?.errorCode === 'ACCURACY_POOR') {
+      return {
+        status: 'accuracy_poor',
+        title: 'GPS accuracy insufficient.',
+        detectedPlace: null,
+        message: 'GPS accuracy insufficient – Please wait for a more accurate reading.',
       };
     }
 
     if (isLocationVerified) {
       return {
         status: 'verified',
-        title: 'Location verified.',
-        description: 'You are at DynamicDNA campus.',
+        title: 'Location Verified.',
+        detectedPlace: 'DynamicDNA Campus.',
+        message: 'You are within the authorised workplace area.',
       };
     }
 
-    if (locationVerificationResult?.errorCode === 'PERMISSION_DENIED') {
-      return {
-        status: 'permission_required',
-        title: 'Location permission required.',
-        description: 'Please enable location permissions in your browser to verify attendance.',
-      };
-    }
-
-    if (
-      locationVerificationResult?.errorCode === 'POSITION_UNAVAILABLE' ||
-      locationVerificationResult?.errorCode === 'TIMEOUT'
-    ) {
-      return {
-        status: 'unable',
-        title: 'Unable to determine location.',
-        description: 'Please ensure GPS or location services are active on your device.',
-      };
-    }
+    const rawPlace = locationVerificationResult?.detectedPlace?.trim();
+    const hasKnownPlace = Boolean(
+      rawPlace &&
+        rawPlace !== 'Unable to identify your current location.' &&
+        rawPlace !== 'Unable to identify your current location'
+    );
+    const detectedPlace = hasKnownPlace ? rawPlace! : 'Unable to identify your current location.';
 
     return {
-      status: 'failed',
-      title: 'Location verification failed.',
-      description: 'You must be present at DynamicDNA to register office attendance.',
+      status: 'outside',
+      title: 'Outside Authorised Area.',
+      detectedPlace: detectedPlace,
+      message: hasKnownPlace
+        ? `You are currently at ${detectedPlace}, which is outside the authorised workplace area.`
+        : 'You are currently outside the authorised workplace area.',
     };
   };
 
@@ -297,8 +331,16 @@ export const LearnerDashboard: React.FC = () => {
                   <span className="text-sm font-bold text-slate-900">
                     Recorded at {todayRecord?.clockInTime} SAST
                   </span>
-                  <span className="text-xs text-emerald-700 block font-semibold">
-                    {todayRecord?.status || 'Present'}
+                  <span
+                    className={`text-xs block font-semibold ${
+                      todayRecord?.status === 'Late' ? 'text-amber-700' : 'text-emerald-700'
+                    }`}
+                  >
+                    {todayRecord?.status === 'Present'
+                      ? 'Present – On Time'
+                      : todayRecord?.status === 'Late'
+                      ? 'Present – Late'
+                      : todayRecord?.status || 'Present'}
                   </span>
                 </div>
               </div>
@@ -362,31 +404,49 @@ export const LearnerDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* 5. Short GPS Verification Result (When applicable) */}
-        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        {/* 5. GPS Verification Result with Detected Place Name */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-start justify-between gap-3 text-xs">
           <div className="flex items-start gap-2.5">
             {locationDisplay.status === 'verified' ? (
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            ) : locationDisplay.status === 'permission_required' ? (
+            ) : locationDisplay.status === 'unverified' ? (
+              <MapPin className="w-4 h-4 text-[#2F3E96] shrink-0 mt-0.5" />
+            ) : locationDisplay.status === 'permission_denied' || locationDisplay.status === 'accuracy_poor' ? (
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
             ) : (
               <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
             )}
-            <div>
+            <div className="space-y-1">
               <span
                 className={`font-bold block ${
                   locationDisplay.status === 'verified'
                     ? 'text-emerald-700'
-                    : locationDisplay.status === 'permission_required'
+                    : locationDisplay.status === 'unverified'
+                    ? 'text-[#2F3E96]'
+                    : locationDisplay.status === 'permission_denied' || locationDisplay.status === 'accuracy_poor'
                     ? 'text-amber-700'
                     : 'text-rose-700'
                 }`}
               >
                 {locationDisplay.title}
               </span>
-              <span className="text-slate-500 block text-[11px]">
-                {locationDisplay.description}
-              </span>
+
+              {locationDisplay.detectedPlace && (
+                <div className="text-slate-700 font-medium text-[11px] flex items-baseline gap-1">
+                  <span className="font-semibold text-slate-500">Detected place:</span>
+                  <span className="font-bold text-slate-800">{locationDisplay.detectedPlace}</span>
+                </div>
+              )}
+
+              <p className="text-slate-600 text-[11px] leading-relaxed">
+                {locationDisplay.message}
+              </p>
+
+              {isOfficeDay && (
+                <div className="text-[10px] text-slate-400">
+                  Map data © OpenStreetMap contributors
+                </div>
+              )}
             </div>
           </div>
 
